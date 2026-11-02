@@ -12,6 +12,7 @@ modules:
       packages:
         - papirus-icon-theme
         - google-noto-sans-runic-fonts
+        - plymouth-plugin-script   # the boot splash is a Plymouth script theme
 
   - type: script
     scripts:
