@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Yggdrasil
+Description=The world tree rises and the runes of Yggdrasil kindle one by one
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/yggdrasil
+ScriptFile=/usr/share/plymouth/themes/yggdrasil/yggdrasil.script

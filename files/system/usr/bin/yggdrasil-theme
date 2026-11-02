@@ -1,0 +1,50 @@
+#!/usr/bin/bash
+# yggdrasil-theme — (re)apply the Yggdrasil look for the current user.
+#   yggdrasil-theme              apply everything now
+#   yggdrasil-theme --first-run  apply once per user (used by autostart)
+#   yggdrasil-theme wallpaper <Fjord|WorldTree|Iron>
+set -u
+MARKER="${XDG_CONFIG_HOME:-$HOME/.config}/yggdrasil/theme-applied-v1"
+WALLS=/usr/share/wallpapers
+
+kw() { kwriteconfig6 "$@" 2>/dev/null || true; }
+
+set_wallpaper() {
+    local name="${1:-Fjord}"
+    local dir="$WALLS/Yggdrasil-$name"
+    [ -d "$dir" ] || { echo "No wallpaper called $name (try Fjord, WorldTree, Iron)"; return 1; }
+    plasma-apply-wallpaperimage "$dir" >/dev/null 2>&1 || true
+    kw --file kscreenlockerrc --group Greeter --key WallpaperPlugin org.kde.image
+    kw --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image \
+       --group General --key Image "file://$dir/"
+}
+
+apply_all() {
+    plasma-apply-lookandfeel --apply org.yggdrasil.desktop >/dev/null 2>&1 || true
+    plasma-apply-colorscheme Yggdrasil >/dev/null 2>&1 || true
+    kw --file kdeglobals --group Icons --key Theme Papirus-Dark
+    kw --file kdeglobals --group Sounds --key Theme yggdrasil
+    kw --file ksplashrc --group KSplash --key Engine KSplashQML
+    kw --file ksplashrc --group KSplash --key Theme org.yggdrasil.desktop
+    kw --file konsolerc --group "Desktop Entry" --key DefaultProfile Yggdrasil.profile
+    set_wallpaper Fjord
+}
+
+case "${1:-}" in
+    --first-run)
+        [ -f "$MARKER" ] && exit 0
+        sleep 4   # let plasmashell finish starting
+        apply_all
+        mkdir -p "$(dirname "$MARKER")" && touch "$MARKER"
+        ;;
+    wallpaper)
+        set_wallpaper "${2:-Fjord}"
+        ;;
+    -h|--help)
+        sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'
+        ;;
+    *)
+        apply_all
+        echo "Yggdrasil theme applied. Log out and back in to see every piece."
+        ;;
+esac

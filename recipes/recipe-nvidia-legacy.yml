@@ -1,0 +1,9 @@
+---
+# yaml-language-server: $schema=https://schema.blue-build.org/recipe-v1.json
+# For older NVIDIA cards (GTX 900 / GTX 1000 / Maxwell & Pascal).
+name: yggdrasil-os-nvidia-legacy
+description: Yggdrasil OS for older NVIDIA GPUs (GTX 900/1000), forged on Bazzite.
+base-image: ghcr.io/ublue-os/bazzite-nvidia
+image-version: stable
+modules:
+  - from-file: common.yml

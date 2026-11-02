@@ -1,0 +1,8 @@
+[Sound Theme]
+Name=Yggdrasil
+Comment=War horns, anvils and oak — the sounds of Yggdrasil OS
+Inherits=ocean,freedesktop
+Directories=stereo
+
+[stereo]
+OutputProfile=stereo

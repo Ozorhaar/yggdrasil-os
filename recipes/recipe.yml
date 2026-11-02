@@ -1,0 +1,9 @@
+---
+# yaml-language-server: $schema=https://schema.blue-build.org/recipe-v1.json
+# Main image: NVIDIA GTX 16xx / RTX 20xx and newer (open kernel modules).
+name: yggdrasil-os
+description: Yggdrasil OS — a Viking-themed gaming desktop, forged on Bazzite (KDE, NVIDIA).
+base-image: ghcr.io/ublue-os/bazzite-nvidia-open
+image-version: stable
+modules:
+  - from-file: common.yml

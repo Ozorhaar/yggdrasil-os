@@ -1,0 +1,20 @@
+---
+# yaml-language-server: $schema=https://schema.blue-build.org/module-list-v1.json
+# Everything Yggdrasil adds on top of Bazzite. Shared by both GPU variants.
+modules:
+  - type: files
+    files:
+      - source: system
+        destination: /
+
+  - type: dnf
+    install:
+      packages:
+        - papirus-icon-theme
+        - google-noto-sans-runic-fonts
+
+  - type: script
+    scripts:
+      - yggdrasil-build.sh
+
+  - type: signing

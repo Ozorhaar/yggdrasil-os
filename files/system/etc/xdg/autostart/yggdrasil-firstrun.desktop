@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Yggdrasil theme setup
+Comment=Applies the Yggdrasil look the first time you log in
+Exec=/usr/bin/yggdrasil-theme --first-run
+OnlyShowIn=KDE;
+NoDisplay=true
+X-KDE-autostart-phase=2

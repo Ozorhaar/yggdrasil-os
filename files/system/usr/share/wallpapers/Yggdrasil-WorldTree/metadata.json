@@ -1,0 +1,8 @@
+{
+    "KPlugin": {
+        "Authors": [{ "Name": "Yggdrasil OS" }],
+        "Id": "Yggdrasil-WorldTree",
+        "License": "CC-BY-SA-4.0",
+        "Name": "Yggdrasil – The World Tree"
+    }
+}
