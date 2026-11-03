@@ -63,6 +63,19 @@ PV="$ROOT/usr/share/plasma/look-and-feel/org.yggdrasil.desktop/contents/previews
 cp "$ROOT/usr/share/wallpapers/Yggdrasil-Fjord/contents/screenshot.png" "$PV/preview.png"
 cp "$ROOT/usr/share/wallpapers/Yggdrasil-Fjord/contents/screenshot.png" "$PV/fullscreenpreview.jpg"
 
+# ---- Yggdrasil icon theme (power / login buttons), falls back to Papirus-Dark
+IT="$ROOT/usr/share/icons/Yggdrasil"; mkdir -p "$IT/actions/scalable"
+cp "$TMP"/icons/*.svg "$IT/actions/scalable/"
+printf '%s\n' '[Icon Theme]' 'Name=Yggdrasil' \
+  "Comment=Papirus-Dark with Yggdrasil's carved-shield power buttons" \
+  'Inherits=Papirus-Dark,breeze-dark,hicolor' 'Directories=actions/scalable' '' \
+  '[actions/scalable]' 'Context=Actions' 'Size=64' 'MinSize=8' 'MaxSize=512' 'Type=Scalable' \
+  > "$IT/index.theme"
+
+# ---- font
+mkdir -p "$ROOT/usr/share/fonts/yggdrasil"
+python3 tools/font.py "$ROOT/usr/share/fonts/yggdrasil/YggdrasilRunic.ttf"
+
 # ---- sounds
 python3 tools/sounds.py "$TMP/snd"
 SND="$ROOT/usr/share/sounds/yggdrasil/stereo"; mkdir -p "$SND"

@@ -3,6 +3,7 @@
 set -euxo pipefail
 
 chmod 0755 /usr/bin/yggdrasil-theme
+fc-cache -f /usr/share/fonts/yggdrasil || true
 
 # ---------------------------------------------------------------- branding
 # Only the display name changes; ID/VARIANT stay Bazzite's so its update and
@@ -22,7 +23,10 @@ ColorScheme=Yggdrasil
 AccentColor=200,162,90
 
 [Icons]
-Theme=Papirus-Dark
+Theme=Yggdrasil
+
+[WM]
+activeFont=Yggdrasil Runic,11,-1,5,50,0,0,0,0,0
 
 [KDE]
 LookAndFeelPackage=org.yggdrasil.desktop

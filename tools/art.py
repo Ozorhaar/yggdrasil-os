@@ -166,13 +166,55 @@ def logo(size=512, color=GOLD, bg=None, band=True):
 
 
 def logo_symbolic(size=64):
-    """Simplified tree mark for small sizes (menu button, tray)."""
-    c = size / 2
-    body = (f'<circle cx="{c}" cy="{c}" r="{size*0.45}" fill="none" stroke="{GOLD}" stroke-width="{size*0.07}"/>')
-    sc = size / 512 * 0.85
-    body += f'<clipPath id="inner"><circle cx="{c}" cy="{c}" r="{size*0.38}"/></clipPath>'
-    body += f'<g clip-path="url(#inner)">{tree_group(c, c, sc, GOLD, seed=3, glow=False, crown_depth=4, root_depth=3)}</g>'
+    """World tree for small sizes (app-menu button, tray): a full leafy crown,
+    trunk and spreading roots, so it reads as a tree even at 22 px."""
+    k = size / 64
+    crown = "".join(f'<circle cx="{x*k}" cy="{y*k}" r="{r*k}"/>' for x, y, r in
+                    ((32, 21, 11), (21, 25, 8.5), (43, 25, 8.5), (25, 16, 7.5), (39, 16, 7.5), (32, 13, 7)))
+    trunk = (f'<path d="M {29*k},{29*k} L {35*k},{29*k} L {34.5*k},{44*k} L {29.5*k},{44*k} Z"/>')
+    roots = (f'<path d="M {32*k},{43*k} Q {26*k},{47*k} {20*k},{51*k} M {32*k},{43*k} Q {38*k},{47*k} {44*k},{51*k} '
+             f'M {32*k},{44*k} L {32*k},{53*k}" fill="none" stroke="{GOLD}" stroke-width="{3.2*k}" stroke-linecap="round"/>')
+    body = (f'<circle cx="{32*k}" cy="{32*k}" r="{29*k}" fill="{NIGHT}" stroke="{GOLD}" stroke-width="{3.5*k}"/>'
+            f'<g fill="{GOLD}">{crown}{trunk}</g>{roots}')
     return svg(size, size, body)
+
+
+def shield_icon(fill, glyph, size=64):
+    """Login/power buttons: a round longship shield with a carved glyph."""
+    k = size / 64
+    body = (f'<circle cx="{32*k}" cy="{32*k}" r="{29*k}" fill="{fill}" stroke="{NIGHT}" stroke-width="{3*k}"/>'
+            f'<circle cx="{32*k}" cy="{32*k}" r="{24.5*k}" fill="none" stroke="#000" stroke-opacity="0.18" stroke-width="{1.5*k}"/>'
+            f'<g transform="scale({k})" fill="none" stroke="#141a26" stroke-width="5" '
+            f'stroke-linecap="square" stroke-linejoin="miter">{glyph}</g>')
+    return svg(size, size, body)
+
+
+def _arc(cx, cy, r, a0, a1, step=45):
+    pts, a = [], a0
+    while a <= a1 + 0.01:
+        pts.append((cx + r * math.cos(math.radians(a)), cy + r * math.sin(math.radians(a))))
+        a += step
+    return pts
+
+
+def power_icons():
+    """name -> svg for the power/login action icons."""
+    pl = lambda pts: "M " + " L ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
+    moon = ('<path d="M 38,15 A 17 17 0 1 0 47,42 A 13 13 0 1 1 38,15 Z" fill="#141a26" stroke="none"/>')
+    ring = _arc(32, 33, 14, -30, 240, 45)  # angular, carved circle
+    restart = (f'<path d="{pl(ring)}"/>'
+               f'<path d="{pl([(ring[-1][0] - 8, ring[-1][1] - 2), ring[-1], (ring[-1][0] + 2, ring[-1][1] + 9)])}"/>')
+    pring = _arc(32, 35, 14, -50, 230, 40)
+    power = f'<path d="{pl(pring)}"/><path d="M 32,14 L 32,32"/>'
+    other = '<path d="M 19,23 L 45,19"/><path d="M 19,34 L 45,30"/><path d="M 19,45 L 45,41"/>'
+    sleep = shield_icon(FROST, moon)
+    return {
+        "system-suspend": sleep,
+        "system-suspend-hibernate": sleep,
+        "system-reboot": shield_icon(GOLD, restart),
+        "system-shutdown": shield_icon(EMBER, power),
+        "system-user-list": shield_icon(BONE, other),
+    }
 
 
 # -------------------------------------------------------------- landscape
@@ -407,6 +449,9 @@ def main():
     for n, s in files.items():
         open(os.path.join(out, n), "w").write(s)
     splash_runes(out)
+    os.makedirs(os.path.join(out, "icons"), exist_ok=True)
+    for name, data in power_icons().items():
+        open(os.path.join(out, "icons", f"{name}.svg"), "w").write(data)
     print("wrote", len(files) + len(NAME_RUNES), "svgs to", out)
 
 

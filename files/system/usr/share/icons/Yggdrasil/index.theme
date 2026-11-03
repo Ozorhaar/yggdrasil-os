@@ -1,0 +1,12 @@
+[Icon Theme]
+Name=Yggdrasil
+Comment=Papirus-Dark with Yggdrasil's carved-shield power buttons
+Inherits=Papirus-Dark,breeze-dark,hicolor
+Directories=actions/scalable
+
+[actions/scalable]
+Context=Actions
+Size=64
+MinSize=8
+MaxSize=512
+Type=Scalable

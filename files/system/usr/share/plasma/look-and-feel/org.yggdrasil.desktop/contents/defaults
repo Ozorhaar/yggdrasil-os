@@ -5,7 +5,10 @@ widgetStyle=Breeze
 ColorScheme=Yggdrasil
 
 [kdeglobals][Icons]
-Theme=Papirus-Dark
+Theme=Yggdrasil
+
+[kdeglobals][WM]
+activeFont=Yggdrasil Runic,11,-1,5,50,0,0,0,0,0
 
 [plasmarc][Theme]
 name=default

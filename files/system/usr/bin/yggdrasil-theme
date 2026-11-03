@@ -4,7 +4,8 @@
 #   yggdrasil-theme --first-run  apply once per user (used by autostart)
 #   yggdrasil-theme wallpaper <Fjord|WorldTree|Iron>
 set -u
-MARKER="${XDG_CONFIG_HOME:-$HOME/.config}/yggdrasil/theme-applied-v1"
+STATE="${XDG_CONFIG_HOME:-$HOME/.config}/yggdrasil"
+MARKER="$STATE/theme-applied-v1"
 WALLS=/usr/share/wallpapers
 
 kw() { kwriteconfig6 "$@" 2>/dev/null || true; }
@@ -19,10 +20,17 @@ set_wallpaper() {
        --group General --key Image "file://$dir/"
 }
 
+# v2: carved-shield power icons + Yggdrasil Runic window titles
+apply_v2() {
+    kw --file kdeglobals --group Icons --key Theme Yggdrasil
+    kw --file kdeglobals --group WM --key activeFont "Yggdrasil Runic,11,-1,5,50,0,0,0,0,0"
+    qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
+}
+
 apply_all() {
     plasma-apply-lookandfeel --apply org.yggdrasil.desktop >/dev/null 2>&1 || true
     plasma-apply-colorscheme Yggdrasil >/dev/null 2>&1 || true
-    kw --file kdeglobals --group Icons --key Theme Papirus-Dark
+    apply_v2
     kw --file kdeglobals --group Sounds --key Theme yggdrasil
     kw --file ksplashrc --group KSplash --key Engine KSplashQML
     kw --file ksplashrc --group KSplash --key Theme org.yggdrasil.desktop
@@ -32,10 +40,15 @@ apply_all() {
 
 case "${1:-}" in
     --first-run)
-        [ -f "$MARKER" ] && exit 0
-        sleep 4   # let plasmashell finish starting
-        apply_all
-        mkdir -p "$(dirname "$MARKER")" && touch "$MARKER"
+        mkdir -p "$STATE"
+        if [ ! -f "$MARKER" ]; then
+            sleep 4   # let plasmashell finish starting
+            apply_all
+            touch "$MARKER" "$STATE/theme-applied-v2"
+        elif [ ! -f "$STATE/theme-applied-v2" ]; then
+            apply_v2   # existing users only get the new pieces
+            touch "$STATE/theme-applied-v2"
+        fi
         ;;
     wallpaper)
         set_wallpaper "${2:-Fjord}"
