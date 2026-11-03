@@ -304,7 +304,7 @@ def longship(x, y, s, hull="#06080d", sail_a=EMBER, sail_b=BONE, shields=(GOLD, 
     return g
 
 
-def wallpaper_fjord(w=3840, h=2160, seed=11):
+def wallpaper_fjord(w=3840, h=2160, seed=11, ship_x=0.36, ship_scale=2.6):
     rnd = random.Random(seed)
     hz = h * 0.62  # horizon / waterline
     defs = (
@@ -353,7 +353,7 @@ def wallpaper_fjord(w=3840, h=2160, seed=11):
         ln = rnd.uniform(20, 120)
         b += f'<rect x="{x:.0f}" y="{y:.0f}" width="{ln:.0f}" height="3" fill="{GOLD_HI}" opacity="{rnd.uniform(0.15, 0.6):.2f}"/>'
     # the ship + its reflection
-    sx, sc = w * 0.36, 2.6
+    sx, sc = w * ship_x, ship_scale
     b += longship(sx, hz + 6, sc)
     b += (f'<g transform="translate(0,{2*(hz+6)}) scale(1,-1)" opacity="0.30" filter="url(#blurref)">'
           f'{longship(sx, hz + 6, sc)}</g>')
@@ -366,7 +366,7 @@ def wallpaper_fjord(w=3840, h=2160, seed=11):
     return svg(w, h, b, defs)
 
 
-def wallpaper_worldtree(w=3840, h=2160, seed=5):
+def wallpaper_worldtree(w=3840, h=2160, seed=5, tree_scale=3.0, ring_scale=1.0):
     rnd = random.Random(seed)
     defs = (
         '<radialGradient id="bg" cx="0.5" cy="0.45" r="0.75">'
@@ -381,9 +381,10 @@ def wallpaper_worldtree(w=3840, h=2160, seed=5):
     b += stars(rnd, w, h, 900, h)
     # three faint realm rings
     for r, o in ((900, 0.10), (680, 0.08), (460, 0.06)):
+        r = r * ring_scale
         b += f'<circle cx="{w/2}" cy="{h*0.5}" r="{r}" fill="none" stroke="{FROST}" stroke-width="2" opacity="{o}"/>'
     b += f'<ellipse cx="{w/2}" cy="{h*0.45}" rx="900" ry="700" fill="url(#halo)"/>'
-    b += tree_group(w / 2, h * 0.54, 3.0, GOLD, seed=7, glow=True, crown_depth=8, root_depth=6)
+    b += tree_group(w / 2, h * 0.54, tree_scale, GOLD, seed=7, glow=True, crown_depth=8, root_depth=6)
     # rune band along the bottom
     d, tw = rune_text(BAND_RUNES, 0, 0, 46, gap=0.9)
     b += (f'<path d="{d}" transform="translate({(w - tw) / 2},{h - 140})" fill="none" '
@@ -404,10 +405,13 @@ def wallpaper_iron(w=3840, h=2160, seed=2):
     b = f'<rect width="{w}" height="{h}" fill="url(#bg)"/>'
     b += f'<rect width="{w}" height="{h}" fill="url(#knot)"/>'
     # small logo bottom-right, very subtle
-    lg = logo(520, color=GOLD, band=True)
+    portrait = h > w
+    size = 760 if portrait else 520
+    lg = logo(size, color=GOLD, band=True)
     inner = lg[lg.index('</defs>') + 7:lg.rindex('</svg>')]
-    b += f'<g transform="translate({w-760},{h-760})" opacity="0.18">{inner}</g>'
-    return svg(w, h, b)
+    x, y = ((w - size) / 2, h * 0.58 - size / 2) if portrait else (w - 760, h - 760)
+    b += f'<g transform="translate({x},{y})" opacity="{0.22 if portrait else 0.18}">{inner}</g>'
+    return svg(w, h, b, defs)
 
 
 def login_bg(w=3840, h=2160):
@@ -445,6 +449,10 @@ def main():
         "wall-worldtree.svg": wallpaper_worldtree(),
         "wall-iron.svg": wallpaper_iron(),
         "name-runes.svg": name_runes_svg(),
+        # phone (portrait) versions for the Android launcher
+        "phone-fjord.svg": wallpaper_fjord(1440, 3120, seed=11, ship_x=0.40, ship_scale=1.85),
+        "phone-worldtree.svg": wallpaper_worldtree(1440, 3120, seed=5, tree_scale=1.45, ring_scale=0.75),
+        "phone-iron.svg": wallpaper_iron(1440, 3120),
     }
     for n, s in files.items():
         open(os.path.join(out, n), "w").write(s)
