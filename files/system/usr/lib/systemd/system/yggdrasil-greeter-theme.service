@@ -1,0 +1,11 @@
+[Unit]
+Description=Apply the Yggdrasil icon theme to the login screen
+Before=plasmalogin.service display-manager.service
+After=systemd-tmpfiles-setup.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/yggdrasil-greeter-theme
+
+[Install]
+WantedBy=multi-user.target

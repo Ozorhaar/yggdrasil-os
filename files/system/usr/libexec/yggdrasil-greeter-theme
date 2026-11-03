@@ -1,0 +1,16 @@
+#!/usr/bin/bash
+# Keeps the login screen (Plasma Login Manager greeter) on the Yggdrasil icon
+# theme. The greeter has its own settings under /var/lib/plasmalogin, which
+# "Apply Plasma Settings" only ever adds to, so a stale icon theme can stick.
+set -euo pipefail
+HOME_DIR=/var/lib/plasmalogin
+[ -d "$HOME_DIR" ] || exit 0
+F="$HOME_DIR/.config/kdeglobals"
+install -d -m 0755 -o plasmalogin -g plasmalogin "$HOME_DIR/.config"
+touch "$F"
+# drop any existing [Icons] block, then add ours
+awk 'BEGIN{skip=0} /^\[/{skip=($0=="[Icons]")} !skip' "$F" > "$F.ygg"
+printf '\n[Icons]\nTheme=Yggdrasil\n' >> "$F.ygg"
+mv "$F.ygg" "$F"
+chown plasmalogin:plasmalogin "$F"
+chmod 0644 "$F"
