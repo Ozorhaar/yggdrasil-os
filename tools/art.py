@@ -366,6 +366,39 @@ def wallpaper_fjord(w=3840, h=2160, seed=11, ship_x=0.36, ship_scale=2.6):
     return svg(w, h, b, defs)
 
 
+def fjord_layers(w=1440, h=3120, seed=11, ship_x=0.40, ship_scale=1.85):
+    """The phone fjord split for the living wallpaper: 'land' (mountains only) and
+    'ship' (longship, its reflection, ripples), both on transparent ground. Uses the
+    same random sequence as wallpaper_fjord, so the mountains match it exactly."""
+    rnd = random.Random(seed)
+    hz = h * 0.62
+    stars(rnd, w, h, 700, hz * 0.7)          # consumed only to keep the sequence identical
+    aurora(rnd, w, h * 0.22, 4)
+    layers = [("#3b2f45", 0.45, 110, 0.58), ("#272640", 0.22, 170, 0.56), ("#171a2c", 0.0, 220, 0.52)]
+    land = ""
+    for col, lift, amp, rough in layers:
+        pts = ridge(rnd, w, hz - 300 - lift * 500, amp, rough)
+        pts = [(x, y + (420 + 300 * lift) * math.exp(-((x - w * 0.62) / (w * 0.13)) ** 2)) for x, y in pts]
+        pts = [(x, min(y, hz)) for x, y in pts]
+        land += poly(pts, w, hz, col)
+    for _ in range(260):                      # sun glitter in the original: drawn live instead
+        rnd.gauss(w * 0.62, w * 0.07); abs(rnd.gauss(0, h * 0.09)); rnd.uniform(20, 120); rnd.uniform(0.15, 0.6)
+    defs = ('<linearGradient id="sailshade" x1="0" y1="0" x2="1" y2="0">'
+            '<stop offset="0" stop-color="#000" stop-opacity="0.55"/><stop offset="0.5" stop-color="#000" stop-opacity="0.25"/>'
+            '<stop offset="1" stop-color="#000" stop-opacity="0.65"/></linearGradient>'
+            '<filter id="blurref"><feGaussianBlur stdDeviation="3 10"/></filter>')
+    sx, sc = w * ship_x, ship_scale
+    ship = longship(sx, hz + 6, sc)
+    ship += (f'<g transform="translate(0,{2*(hz+6)}) scale(1,-1)" opacity="0.30" filter="url(#blurref)">'
+             f'{longship(sx, hz + 6, sc)}</g>')
+    for _ in range(140):
+        x = rnd.uniform(0, w)
+        y = hz + rnd.uniform(10, h - hz) ** 1.0
+        ship += (f'<rect x="{x:.0f}" y="{y:.0f}" width="{rnd.uniform(40, 260):.0f}" height="2" '
+                 f'fill="{FROST}" opacity="{rnd.uniform(0.04, 0.12):.2f}"/>')
+    return {"land": svg(w, h, land), "ship": svg(w, h, ship, defs)}
+
+
 def wallpaper_worldtree(w=3840, h=2160, seed=5, tree_scale=3.0, ring_scale=1.0):
     rnd = random.Random(seed)
     defs = (
