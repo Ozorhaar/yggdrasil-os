@@ -4,3 +4,4 @@ cosign.private
 *.iso
 *.iso-CHECKSUM
 __pycache__/
+/out/
