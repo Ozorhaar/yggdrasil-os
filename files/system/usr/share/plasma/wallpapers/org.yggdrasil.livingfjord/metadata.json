@@ -1,0 +1,12 @@
+{
+    "KPackageStructure": "Plasma/Wallpaper",
+    "KPlugin": {
+        "Authors": [{ "Name": "Yggdrasil OS" }],
+        "Description": "The fjord at dusk, alive: drifting aurora, twinkling stars, shimmering water and a rocking longship",
+        "Icon": "yggdrasil-logo",
+        "Id": "org.yggdrasil.livingfjord",
+        "License": "CC-BY-SA-4.0",
+        "Name": "Yggdrasil – Living Fjord"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

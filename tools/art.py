@@ -311,9 +311,7 @@ def longship(x, y, s, hull="#06080d", sail_a=EMBER, sail_b=BONE, shields=(GOLD, 
     return g
 
 
-def wallpaper_fjord(w=3840, h=2160, seed=11, ship_x=0.36, ship_scale=2.6):
-    rnd = random.Random(seed)
-    hz = h * 0.62  # horizon / waterline
+def _fjord_defs(w, h):
     defs = (
         '<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">'
         f'<stop offset="0" stop-color="#070b16"/><stop offset="0.45" stop-color="#1a2342"/>'
@@ -336,6 +334,13 @@ def wallpaper_fjord(w=3840, h=2160, seed=11, ship_x=0.36, ship_scale=2.6):
         f'<filter id="soft2" filterUnits="userSpaceOnUse" x="-800" y="-800" width="{w+1600}" height="{h+1600}"><feGaussianBlur stdDeviation="6"/></filter>'
         '<filter id="blurref"><feGaussianBlur stdDeviation="3 10"/></filter>'
     )
+    return defs
+
+
+def wallpaper_fjord(w=3840, h=2160, seed=11, ship_x=0.36, ship_scale=2.6):
+    rnd = random.Random(seed)
+    hz = h * 0.62  # horizon / waterline
+    defs = _fjord_defs(w, h)
     b = f'<rect width="{w}" height="{h}" fill="url(#sky)"/>'
     b += stars(rnd, w, h, 700, hz * 0.7)
     b += aurora(rnd, w, h * 0.22, 4)
@@ -371,6 +376,55 @@ def wallpaper_fjord(w=3840, h=2160, seed=11, ship_x=0.36, ship_scale=2.6):
         b += (f'<rect x="{x:.0f}" y="{y:.0f}" width="{rnd.uniform(40, 260):.0f}" height="2" '
               f'fill="{FROST}" opacity="{rnd.uniform(0.04, 0.12):.2f}"/>')
     return svg(w, h, b, defs)
+
+
+def desktop_fjord_layers(w=3840, h=2160, seed=11, ship_x=0.36, ship_scale=2.6):
+    """The desktop fjord split into layers for the Living Fjord wallpaper. Same
+    random sequence as wallpaper_fjord, so the pieces stack into exactly that
+    picture. Returns {name: svg}: base (sky, sun, water, land reflection), stars,
+    aurora, land, glitter_a / glitter_b (two sets of sun glitter to cross-fade),
+    ripples and ship (longship plus its reflection)."""
+    rnd = random.Random(seed)
+    hz = h * 0.62
+    defs = _fjord_defs(w, h)
+    sky = f'<rect width="{w}" height="{h}" fill="url(#sky)"/>'
+    st = stars(rnd, w, h, 700, hz * 0.7)
+    au = aurora(rnd, w, h * 0.22, 4)
+    sun = f'<ellipse cx="{w*0.62}" cy="{hz}" rx="{w*0.35}" ry="{h*0.22}" fill="url(#sun)"/>'
+    layers = [("#3b2f45", 0.45, 110, 0.58), ("#272640", 0.22, 170, 0.56), ("#171a2c", 0.0, 220, 0.52)]
+    land = ""
+    for col, lift, amp, rough in layers:
+        pts = ridge(rnd, w, hz - 300 - lift * 500, amp, rough)
+        pts = [(x, y + (420 + 300 * lift) * math.exp(-((x - w * 0.62) / (w * 0.13)) ** 2)) for x, y in pts]
+        pts = [(x, min(y, hz)) for x, y in pts]
+        land += poly(pts, w, hz, col)
+    water = f'<rect y="{hz}" width="{w}" height="{h-hz}" fill="url(#water)"/>'
+    water += f'<g transform="translate(0,{2*hz}) scale(1,-1)" opacity="0.35" filter="url(#blurref)">{land}</g>'
+
+    def glitter(r):
+        g = ""
+        for _ in range(260):
+            x = r.gauss(w * 0.62, w * 0.07)
+            y = hz + abs(r.gauss(0, h * 0.09))
+            ln = r.uniform(20, 120)
+            g += f'<rect x="{x:.0f}" y="{y:.0f}" width="{ln:.0f}" height="3" fill="{GOLD_HI}" opacity="{r.uniform(0.15, 0.6):.2f}"/>'
+        return g
+    glit_a = glitter(rnd)
+    sx, sc = w * ship_x, ship_scale
+    ship = longship(sx, hz + 6, sc)
+    ship += (f'<g transform="translate(0,{2*(hz+6)}) scale(1,-1)" opacity="0.30" filter="url(#blurref)">'
+             f'{longship(sx, hz + 6, sc)}</g>')
+    rip = ""
+    for _ in range(140):
+        x = rnd.uniform(0, w)
+        y = hz + rnd.uniform(10, h - hz) ** 1.0
+        rip += (f'<rect x="{x:.0f}" y="{y:.0f}" width="{rnd.uniform(40, 260):.0f}" height="2" '
+                f'fill="{FROST}" opacity="{rnd.uniform(0.04, 0.12):.2f}"/>')
+    glit_b = glitter(random.Random(seed + 100))
+    return {"base": svg(w, h, sky + sun + water, defs), "stars": svg(w, h, st, defs),
+            "aurora": svg(w, h, au, defs), "land": svg(w, h, land, defs),
+            "glitter_a": svg(w, h, glit_a, defs), "glitter_b": svg(w, h, glit_b, defs),
+            "ripples": svg(w, h, rip, defs), "ship": svg(w, h, ship, defs)}
 
 
 def fjord_layers(w=1440, h=3120, seed=11, ship_x=0.40, ship_scale=1.85):

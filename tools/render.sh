@@ -31,6 +31,19 @@ EOF
 wall Fjord wall-fjord.svg "Yggdrasil – Fjord at Dusk"
 wall WorldTree wall-worldtree.svg "Yggdrasil – The World Tree"
 wall Iron wall-iron.svg "Yggdrasil – Forged Iron"
+# living wallpaper (Plasma wallpaper plugin): the fjord in moving layers
+LF="$ROOT/usr/share/plasma/wallpapers/org.yggdrasil.livingfjord/contents/images"; mkdir -p "$LF"
+python3 - "$TMP/living" <<'PY'
+import os, sys
+sys.path.insert(0, "tools")
+import art
+os.makedirs(sys.argv[1], exist_ok=True)
+for name, doc in art.desktop_fjord_layers().items():
+    open(os.path.join(sys.argv[1], name + ".svg"), "w").write(doc)
+PY
+for f in "$TMP"/living/*.svg; do
+  rsvg-convert -w 3840 -h 2160 "$f" -o "$LF/$(basename "$f" .svg).png"
+done
 # generic background path some tools look for
 mkdir -p "$ROOT/usr/share/backgrounds/yggdrasil"
 cp "$ROOT/usr/share/wallpapers/Yggdrasil-Fjord/contents/images/3840x2160.jpg" "$ROOT/usr/share/backgrounds/yggdrasil/fjord.jpg"

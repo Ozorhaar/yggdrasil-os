@@ -2,7 +2,7 @@
 # yggdrasil-theme — (re)apply the Yggdrasil look for the current user.
 #   yggdrasil-theme              apply everything now
 #   yggdrasil-theme --first-run  apply once per user (used by autostart)
-#   yggdrasil-theme wallpaper <Fjord|WorldTree|Iron>
+#   yggdrasil-theme wallpaper <Living|Fjord|WorldTree|Iron>
 #   yggdrasil-theme login-sound <chiptune|horn|off>
 set -u
 STATE="${XDG_CONFIG_HOME:-$HOME/.config}/yggdrasil"
@@ -10,22 +10,38 @@ MARKER="$STATE/theme-applied-v1"
 WALLS=/usr/share/wallpapers
 
 kw() { kwriteconfig6 "$@" 2>/dev/null || true; }
+# Fedora ships the Qt 6 qdbus as qdbus-qt6 / qdbus, not qdbus6
+QDBUS=$(command -v qdbus6 || command -v qdbus-qt6 || command -v qdbus || echo true)
 
-set_wallpaper() {
-    local name="${1:-Fjord}"
-    local dir="$WALLS/Yggdrasil-$name"
-    [ -d "$dir" ] || { echo "No wallpaper called $name (try Fjord, WorldTree, Iron)"; return 1; }
-    plasma-apply-wallpaperimage "$dir" >/dev/null 2>&1 || true
+# the lock screen keeps the still fjord (it can't run wallpaper plugins' motion)
+set_lockscreen() {
+    local dir="$WALLS/Yggdrasil-${1:-Fjord}"
     kw --file kscreenlockerrc --group Greeter --key WallpaperPlugin org.kde.image
     kw --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image \
        --group General --key Image "file://$dir/"
+}
+
+set_living() {
+    "$QDBUS" org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript \
+        'for (const d of desktops()) { d.wallpaperPlugin = "org.yggdrasil.livingfjord"; }' \
+        >/dev/null 2>&1 || true
+    set_lockscreen Fjord
+}
+
+set_wallpaper() {
+    local name="${1:-Living}"
+    if [ "$name" = Living ]; then set_living; return; fi
+    local dir="$WALLS/Yggdrasil-$name"
+    [ -d "$dir" ] || { echo "No wallpaper called $name (try Living, Fjord, WorldTree, Iron)"; return 1; }
+    plasma-apply-wallpaperimage "$dir" >/dev/null 2>&1 || true
+    set_lockscreen "$name"
 }
 
 # v2: carved-shield power icons + Yggdrasil Runic window titles
 apply_v2() {
     kw --file kdeglobals --group Icons --key Theme Yggdrasil
     kw --file kdeglobals --group WM --key activeFont "Yggdrasil Runic,11,-1,5,50,0,0,0,0,0"
-    qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
+    "$QDBUS" org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
 }
 
 apply_all() {
@@ -36,7 +52,7 @@ apply_all() {
     kw --file ksplashrc --group KSplash --key Engine KSplashQML
     kw --file ksplashrc --group KSplash --key Theme org.yggdrasil.desktop
     kw --file konsolerc --group "Desktop Entry" --key DefaultProfile Yggdrasil.profile
-    set_wallpaper Fjord
+    set_wallpaper Living
 }
 
 case "${1:-}" in
@@ -45,14 +61,21 @@ case "${1:-}" in
         if [ ! -f "$MARKER" ]; then
             sleep 4   # let plasmashell finish starting
             apply_all
-            touch "$MARKER" "$STATE/theme-applied-v2"
-        elif [ ! -f "$STATE/theme-applied-v2" ]; then
-            apply_v2   # existing users only get the new pieces
-            touch "$STATE/theme-applied-v2"
+            touch "$MARKER" "$STATE/theme-applied-v2" "$STATE/theme-applied-v3"
+        else   # existing users only get the new pieces, once each
+            if [ ! -f "$STATE/theme-applied-v2" ]; then
+                apply_v2
+                touch "$STATE/theme-applied-v2"
+            fi
+            if [ ! -f "$STATE/theme-applied-v3" ]; then
+                sleep 4
+                set_living   # v3: the Living Fjord wallpaper
+                touch "$STATE/theme-applied-v3"
+            fi
         fi
         ;;
     wallpaper)
-        set_wallpaper "${2:-Fjord}"
+        set_wallpaper "${2:-Living}"
         ;;
     login-sound)
         SND=/usr/share/sounds/yggdrasil/stereo

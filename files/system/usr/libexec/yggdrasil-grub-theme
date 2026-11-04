@@ -38,6 +38,9 @@ if loadfont \$prefix/themes/yggdrasil/yggdrasil-runic-24.pf2; then
   set theme=\$prefix/themes/yggdrasil/theme.txt
   export theme
 fi
+# keep the menu up long enough to see it and choose
+set timeout_style=menu
+set timeout=3
 $END
 BLOCK
 }
