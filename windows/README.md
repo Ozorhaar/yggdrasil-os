@@ -5,7 +5,7 @@ Per-user only, no admin rights, no theme patchers, nothing injected into Explore
 
 | Part | What it is |
 |---|---|
-| **Yggdrasil Sky** (`sky/`) | The living fjord wallpaper: a port of the launcher's `FjordScene` running in WebView2 behind the desktop icons. Sky follows the real sunrise/sunset and Open-Meteo weather (rain, snow, storms, fog, clouds), with aurora on dark clear nights. Draws ~15 fps only while something moves, once a minute otherwise; pauses when a window is maximised and suspends for games, full-screen apps, lock and display-off. Plays the sign-in horn (Windows 8+ has no working sign-in sound). Tray menu: demo, pause, refresh weather, quit. |
+| **Yggdrasil Sky** (`sky/`) | The living fjord wallpaper: a port of the launcher's `FjordScene` running in WebView2 behind the desktop icons. Sky follows the real sunrise/sunset and Open-Meteo weather (rain, snow, storms, fog, clouds), with aurora on dark clear nights. Draws ~15 fps for weather and aurora, 5 fps on calm days (drifting clouds, shimmering water); pauses when a window is maximised and suspends for games, full-screen apps, lock and display-off. Plays the sign-in horn (Windows 8+ has no working sign-in sound). Tray menu: demo, pause, refresh weather, quit. |
 | Wallpapers | Fjord, World Tree, Iron at 5120×1440 (`theme/Wallpapers`). Fjord is the static fallback under Sky and the lock screen. |
 | Sounds | `theme/Sounds`, 16-bit PCM WAV, registered as the "Yggdrasil" sound scheme: Mjolnir (notifications, IM, SMS), Ravens (mail), Rune Stone (reminders), Heimdall (UAC), anvil dialogs, wooden device knocks, Mountain King (Phone Link calls), Longship (alarms). |
 | Colours | Dark mode, gold `#C8A25A` accent, dark taskbar/Start with gold highlights. |
@@ -27,7 +27,7 @@ Runes follow the Yggdrasil rule: never sowilo, tiwaz, algiz, othala or jera (`wi
 
 `Uninstall.ps1` stops Sky, removes everything and restores the backup.
 
-Sky's settings: `%LOCALAPPDATA%\Yggdrasil\Sky\settings.json` (location, fps, `RenderScale`, `PauseWhenCovered`, `Weather`, `SignInHorn`, `UnlockHorn`). Log: `sky.log` in the same folder.
+Sky's settings: `%LOCALAPPDATA%\Yggdrasil\Sky\settings.json` (location, `Fps`, `CalmFps`, `RenderScale`, `PauseWhenCovered`, `Weather`, `SignInHorn`, `UnlockHorn`). Log: `sky.log` in the same folder.
 
 ## Build
 
