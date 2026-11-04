@@ -73,6 +73,15 @@ $Sounds   = Join-Path $Theme 'Sounds'
 $Wall     = Join-Path $Theme 'Wallpapers\Yggdrasil - Fjord.jpg'
 New-Item -ItemType Directory -Force -Path $Root, $Backup | Out-Null
 
+# If anything below fails after Sky was stopped, start it again rather than leaving the desktop static.
+$SkyExe = Join-Path $SkyDir 'YggdrasilSky.exe'
+trap {
+    if (-not $NoSky -and (Test-Path -LiteralPath $SkyExe) -and -not (Get-Process YggdrasilSky -ErrorAction SilentlyContinue)) {
+        Start-Process -FilePath $SkyExe
+    }
+    break
+}
+
 # --------------------------------------------------------------------- 2. backup (first install only)
 if (-not (Test-Path (Join-Path $Backup 'done'))) {
     Say "Backing up your current settings to $Backup"
@@ -155,7 +164,15 @@ Say "Installing the Yggdrasil Runic font for your account"
 $fontDir = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\Fonts'
 New-Item -ItemType Directory -Force -Path $fontDir | Out-Null
 $font = Join-Path $fontDir 'YggdrasilRunic.ttf'
-Copy-Item (Join-Path $Theme 'Fonts\YggdrasilRunic.ttf') $font -Force
+if (Test-Path -LiteralPath "$font.new") { try { Move-Item "$font.new" $font -Force } catch { } }
+$newFont = Join-Path $Theme 'Fonts\YggdrasilRunic.ttf'
+$same = (Test-Path -LiteralPath $font) -and
+        ((Get-FileHash -LiteralPath $font).Hash -eq (Get-FileHash -LiteralPath $newFont).Hash)
+if (-not $same) {
+    try { Copy-Item $newFont $font -Force }
+    catch { Say "The font is in use; the new one goes in next time you run Install.ps1 after signing in again" 'Yellow'
+            Copy-Item $newFont "$font.new" -Force }   # swapped in on the next run
+}
 Ensure-Key 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts'
 Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts' -Name 'Yggdrasil Runic (TrueType)' -Value $font
 
