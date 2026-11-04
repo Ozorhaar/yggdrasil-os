@@ -10,7 +10,11 @@ Writes .ogg files:
                   Yggdrasil - Heimdall.ogg        one low watch-horn note (Home Assistant / Frigate)
                   Yggdrasil - War Horn.ogg        three hard blasts (PagerDuty / urgent)
                   Yggdrasil - Rune Stone.ogg      two soft stone taps (calendar / reminders)
+                  Yggdrasil - War Drums.ogg       DUM . DUM-DUM . DUM (everything else)
+  Ringtones/      Yggdrasil - Freyja's Lyre.ogg   a warm lyre tune over a drone (one person's calls)
+                  Yggdrasil - Allfather.ogg       slow horn call over the war drums (another's calls)
   Alarms/         Yggdrasil - Longship.ogg        rowing drum that speeds up, then a horn
+  Keys/           rune_tap / rune_space / rune_delete / rune_enter (.ogg) for Yggdrasil Keys
 """
 import os
 import subprocess
@@ -206,6 +210,79 @@ def war_drums():
     return reverb(mix(*parts), 0.35)
 
 
+# ------------------------------------------------------------------ contact ringtones
+def midi(m):
+    return 440.0 * 2 ** ((m - 69) / 12)
+
+
+def pluck(f0, dur=2.2, bright=0.6, seed=0):
+    """A lyre string (Karplus-Strong), warm rather than twangy."""
+    n = int(dur * SR)
+    p = max(2, int(round(SR / f0)))
+    rng = np.random.default_rng(seed)
+    buf = lp(rng.uniform(-1, 1, p * 4), 900 + 3000 * bright, 2)[-p:]
+    out = np.zeros(n)
+    for i in range(n):
+        v = buf[i % p]
+        out[i] = v
+        buf[i % p] = 0.996 * 0.5 * (v + buf[(i + 1) % p])
+    body = bp(out, 150, 2400)
+    return (0.7 * out + 0.5 * body) * env(n, 0.002, 0.3)
+
+
+def freyja():
+    """A lilting tune on the lyre over a soft open-fifth drone, played through twice."""
+    beat = 0.36
+    a = [(69, 1), (74, 1), (72, 1), (69, 2), (67, 1), (69, 1.5), (65, .5), (67, 1), (69, 3)]
+    b = [(72, 1), (74, 1), (76, 1), (74, 2), (72, 1), (69, 1.5), (67, .5), (65, 1), (62, 3)]
+    parts, t, k = [], 0.0, 0
+    for _ in range(2):
+        for phrase, root in ((a, 50), (b, 50)):
+            parts.append((t, pluck(midi(root), 3.5, 0.3, 500 + k) * 0.5))         # low string on each phrase
+            parts.append((t + beat * 3, pluck(midi(root + 7), 3.0, 0.3, 600 + k) * 0.35))
+            for m, d in phrase:
+                parts.append((t, pluck(midi(m), 2.4, 0.6, k)))
+                if d >= 2:  # a sixth below on the long notes, like a second string ringing
+                    parts.append((t + 0.03, pluck(midi(m - 9), 2.4, 0.5, 900 + k) * 0.45))
+                t += d * beat
+                k += 1
+    total = t + 2.5
+    tt = np.arange(int(total * SR)) / SR
+    drone = (np.sin(2 * np.pi * midi(38) * tt) + 0.6 * np.sin(2 * np.pi * midi(45) * tt) + 0.25 * np.sin(2 * np.pi * midi(50) * tt))
+    drone = lp(np.tanh(drone), 900) * 0.10 * env(len(tt), 1.5, 2.0)
+    parts.append((0.0, drone))
+    return reverb(mix(*parts), 0.45)
+
+
+def allfather():
+    """A slow, stately horn call with the war drums keeping time beneath it."""
+    parts = []
+    beat = 0.75
+    calls = [  # (start beat, Hz path, seconds)
+        (0, [147, 147, 146], 1.3), (2, [196, 220, 220, 219], 2.0),
+        (5, [175, 175], 0.8), (6, [196, 196], 0.8), (7, [220, 220, 220], 2.2),
+        (10, [147, 147], 1.0), (11.5, [220, 294, 294, 293], 3.2),
+    ]
+    for b, fz, d in calls:
+        parts.append((b * beat, horn(fz, d, attack=0.15, release=0.7) * 0.85))
+        parts.append((b * beat + 0.02, horn([f / 2 for f in fz], d, attack=0.2, release=0.7) * 0.45))  # second horn an octave down
+    for i in range(20):
+        accent = 1.0 if i % 4 == 0 else 0.55
+        parts.append((i * beat, drum(118 if i % 4 == 0 else 136, accent, 200 + i)))
+    return reverb(mix(*parts), 0.4)
+
+
+# ------------------------------------------------------------------ keyboard taps
+def rune_key(f0, dur, grit, seed):
+    """A tiny stone-on-wood tap for a key press."""
+    rng = np.random.default_rng(seed)
+    n = int(dur * SR)
+    t = np.arange(n) / SR
+    body = np.sin(2 * np.pi * f0 * t) * np.exp(-t * 90) + 0.4 * np.sin(2 * np.pi * f0 * 2.3 * t) * np.exp(-t * 140)
+    click = bp(rng.standard_normal(n), 1800, 6000) * np.exp(-t * 600) * grit
+    return (body + click) * env(n, 0.0005, 0.01)
+
+
 # ------------------------------------------------------------------ output
 def write_ogg(path, x, peak):
     x = norm(x, peak)
@@ -248,6 +325,15 @@ def main():
     write_ogg(os.path.join(n, "Yggdrasil - War Horn.ogg"), war_horn(), 0.95)
     write_ogg(os.path.join(n, "Yggdrasil - Rune Stone.ogg"), rune_stone(), 0.9)
     write_ogg(os.path.join(n, "Yggdrasil - War Drums.ogg"), war_drums(), 0.95)
+    r = os.path.join(out, "Ringtones")
+    write_ogg(os.path.join(r, "Yggdrasil - Freyja's Lyre.ogg"), freyja(), 0.9)
+    write_ogg(os.path.join(r, "Yggdrasil - Allfather.ogg"), allfather(), 0.95)
+    k = os.path.join(out, "Keys")
+    os.makedirs(k, exist_ok=True)
+    write_ogg(os.path.join(k, "rune_tap.ogg"), rune_key(420, 0.06, 0.8, 1), 0.5)
+    write_ogg(os.path.join(k, "rune_space.ogg"), rune_key(300, 0.08, 0.6, 2), 0.5)
+    write_ogg(os.path.join(k, "rune_delete.ogg"), rune_key(260, 0.07, 1.0, 3), 0.5)
+    write_ogg(os.path.join(k, "rune_enter.ogg"), rune_key(200, 0.11, 0.7, 4), 0.55)
     write_ogg(os.path.join(out, "Alarms", "Yggdrasil - Longship.ogg"), longship(), 0.95)
 
 
