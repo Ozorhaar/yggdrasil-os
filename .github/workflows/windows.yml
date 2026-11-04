@@ -1,0 +1,81 @@
+# Yggdrasil for Windows: builds Yggdrasil Sky and the theme package.
+# Every action is pinned to a full commit SHA (tag in the comment).
+name: windows
+
+on:
+  push:
+    branches: [main]
+    paths: ["windows/**", ".github/workflows/windows.yml"]
+    tags: ["windows-v*"]
+  pull_request:
+    paths: ["windows/**", ".github/workflows/windows.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      id-token: write        # build provenance
+      attestations: write
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Lint PowerShell
+        shell: pwsh
+        run: |
+          foreach ($f in Get-ChildItem windows -Recurse -Filter *.ps1) {
+            $tokens = $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tokens, [ref]$errors)
+            if ($errors) { $errors | Format-List; throw "parse errors in $($f.Name)" }
+          }
+
+      - name: Build and package
+        shell: pwsh
+        run: |
+          $v = if ($env:GITHUB_REF -like 'refs/tags/windows-v*') { $env:GITHUB_REF_NAME.Substring(9) } else { "0.0.0-ci.$env:GITHUB_RUN_NUMBER" }
+          ./windows/tools/package.ps1 -Version $v
+
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        if: github.event_name != 'pull_request'
+        with:
+          subject-path: out/Yggdrasil-Windows-*.zip
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Yggdrasil-Windows
+          path: |
+            out/Yggdrasil-Windows-*.zip
+            out/Yggdrasil-Windows-*.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/windows-v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: Yggdrasil-Windows
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" Yggdrasil-Windows-*.zip Yggdrasil-Windows-*.zip.sha256 \
+            --repo "$GITHUB_REPOSITORY" --title "Yggdrasil for Windows ${GITHUB_REF_NAME#windows-v}" \
+            --notes "Verify before installing: gh attestation verify <zip> --repo $GITHUB_REPOSITORY"
