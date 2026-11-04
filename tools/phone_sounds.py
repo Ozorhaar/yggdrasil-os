@@ -197,6 +197,15 @@ def longship():
     return reverb(mix(*parts), 0.4)
 
 
+# ------------------------------------------------------------------ default notification
+def war_drums():
+    """The everything-else alert: DUM . DUM-DUM . DUM! on the big war drums."""
+    hits = [(0.00, 128, 0.80), (0.46, 140, 0.60), (0.66, 140, 0.70), (1.08, 112, 1.00)]
+    parts = [(t, drum(f, v, 40 + i)) for i, (t, f, v) in enumerate(hits)]
+    parts.append((1.08, drum(170, 0.45, 60)))     # a second drummer lands the last stroke with you
+    return reverb(mix(*parts), 0.35)
+
+
 # ------------------------------------------------------------------ output
 def write_ogg(path, x, peak):
     x = norm(x, peak)
@@ -238,6 +247,7 @@ def main():
     write_ogg(os.path.join(n, "Yggdrasil - Heimdall.ogg"), heimdall(), 0.85)
     write_ogg(os.path.join(n, "Yggdrasil - War Horn.ogg"), war_horn(), 0.95)
     write_ogg(os.path.join(n, "Yggdrasil - Rune Stone.ogg"), rune_stone(), 0.9)
+    write_ogg(os.path.join(n, "Yggdrasil - War Drums.ogg"), war_drums(), 0.95)
     write_ogg(os.path.join(out, "Alarms", "Yggdrasil - Longship.ogg"), longship(), 0.95)
 
 
