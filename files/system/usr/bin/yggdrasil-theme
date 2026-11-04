@@ -3,6 +3,7 @@
 #   yggdrasil-theme              apply everything now
 #   yggdrasil-theme --first-run  apply once per user (used by autostart)
 #   yggdrasil-theme wallpaper <Fjord|WorldTree|Iron>
+#   yggdrasil-theme login-sound <chiptune|horn|off>
 set -u
 STATE="${XDG_CONFIG_HOME:-$HOME/.config}/yggdrasil"
 MARKER="$STATE/theme-applied-v1"
@@ -53,8 +54,19 @@ case "${1:-}" in
     wallpaper)
         set_wallpaper "${2:-Fjord}"
         ;;
+    login-sound)
+        SND=/usr/share/sounds/yggdrasil/stereo
+        mkdir -p "$STATE"
+        case "${2:-}" in
+            chiptune) rm -f "$STATE/login-sound.oga" "$STATE/login-sound-off" ;;
+            horn)     rm -f "$STATE/login-sound-off"; ln -sfn "$SND/desktop-login-horn.oga" "$STATE/login-sound.oga" ;;
+            off)      touch "$STATE/login-sound-off" ;;
+            *) echo "usage: yggdrasil-theme login-sound <chiptune|horn|off>"; exit 1 ;;
+        esac
+        echo "Login sound: $2"
+        ;;
     -h|--help)
-        sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'
+        sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'
         ;;
     *)
         apply_all

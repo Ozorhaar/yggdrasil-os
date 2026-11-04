@@ -116,13 +116,14 @@ DOTS = {  # filled diamonds: (width, [(cx, cy), ...])
     "\u00B7": (.16, [(.08, .45)]),
     "\u2026": (.80, [(.08, .08), (.40, .08), (.72, .08)]),
 }
-# ᛃ (jera) gets wider-set hooks than the artwork so it can't blur into an S at text sizes
+# ᛃ (jera; kept in the font for completeness, never used in the theme) gets wider-set hooks than the artwork so it can't blur into an S at text sizes
 FONT_RUNES = {"Y": (.80, [[(.30, .08), (.04, .34), (.30, .60)], [(.50, .40), (.76, .66), (.50, .92)]])}
 EXTRA = {"!": [[(.08, 1), (.08, .32)]], ",": [[(.12, .06), (0, -.18)]], ";": [[(.12, .06), (0, -.18)]]}
 
 RUNE_CP = {"F": 0x16A0, "U": 0x16A2, "TH": 0x16A6, "A": 0x16A8, "R": 0x16B1, "K": 0x16B2,
            "G": 0x16B7, "W": 0x16B9, "H": 0x16BA, "N": 0x16BE, "I": 0x16C1, "Y": 0x16C3,
-           "P": 0x16C8, "S": 0x16CB, "B": 0x16D2, "E": 0x16D6, "M": 0x16D7, "L": 0x16DA, "D": 0x16DE}
+           "P": 0x16C8, "S": 0x16CB, "B": 0x16D2, "E": 0x16D6, "M": 0x16D7, "L": 0x16DA, "D": 0x16DE,
+           "UY": 0x16A4, "SS": 0x16CC}
 
 
 def outline(polylines, dots, xs, ys):
@@ -192,7 +193,11 @@ def build(out):
     for key, cp in RUNE_CP.items():
         w, strokes = FONT_RUNES.get(key, RUNES[key])
         pls = [[(x, 1 - y) for x, y in s] for s in strokes]
-        add(f"uni{cp:04X}", cp, w, pls)
+        # a near-zero stroke in the artwork is a dot (dotted ur ᚤ): use a diamond
+        dots = [((s[0][0] + s[-1][0]) / 2, (s[0][1] + s[-1][1]) / 2) for s in pls
+                if abs(s[0][0] - s[-1][0]) + abs(s[0][1] - s[-1][1]) < 0.1 and len(s) == 2]
+        pls = [s for s in pls if not (len(s) == 2 and abs(s[0][0] - s[-1][0]) + abs(s[0][1] - s[-1][1]) < 0.1)]
+        add(f"uni{cp:04X}", cp, w, pls, dots)
     add("uni16EB", 0x16EB, .16, [], [(.08, .45)])  # runic single punctuation ᛫
     add("uni16EC", 0x16EC, .16, [], [(.08, .2), (.08, .7)])  # ᛬
 

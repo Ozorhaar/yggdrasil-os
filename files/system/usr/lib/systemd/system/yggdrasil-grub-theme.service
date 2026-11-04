@@ -1,0 +1,12 @@
+[Unit]
+Description=Install the Yggdrasil boot-menu theme on /boot
+RequiresMountsFor=/boot
+After=local-fs.target
+ConditionPathIsDirectory=/boot/grub2
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/yggdrasil-grub-theme
+
+[Install]
+WantedBy=multi-user.target

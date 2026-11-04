@@ -100,12 +100,14 @@ def transpose(n, octaves):
 FULL_PLAN = [(96, 104, 0), (108, 128, 1), (132, 160, 2), (164, 196, 3), (200, 232, 4)]
 
 
-def render(out, plan=None, ending=True):
-    # each cycle: (bpm start, bpm end, intensity 0..4)
+def render(out, plan=None, ending=True, sections=None, peak=0.85):
+    # each cycle: (bpm start, bpm end, intensity 0..4); sections: which parts of
+    # the tune one cycle plays (default the whole A A B A form)
     plan = plan or FULL_PLAN
+    sections = sections or CYCLE
     tracks = []
     for bpm0, bpm1, level in plan:
-        bars = [bar for sec in CYCLE for bar in zip(*sec)]
+        bars = [bar for sec in sections for bar in zip(*sec)]
         nbars = len(bars)
         for bi, (mel, bass) in enumerate(bars):
             bpm = bpm0 + (bpm1 - bpm0) * bi / max(1, nbars - 1)
@@ -156,7 +158,7 @@ def render(out, plan=None, ending=True):
         tracks.append(hit)
         tracks.append(np.zeros(int(0.5 * beat * SR)))
     x = np.concatenate(tracks)
-    x = x / np.max(np.abs(x)) * 0.85
+    x = x / np.max(np.abs(x)) * peak
     # gentle low-pass to soften the aliasing a real NES DAC wouldn't have
     x = np.convolve(x, np.ones(3) / 3, mode="same")
     st = (np.stack([x, x], 1) * 32767).astype(np.int16)

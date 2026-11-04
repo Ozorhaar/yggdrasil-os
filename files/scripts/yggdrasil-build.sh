@@ -6,6 +6,8 @@ chmod 0755 /usr/bin/yggdrasil-theme
 fc-cache -f /usr/share/fonts/yggdrasil || true
 chmod 0755 /usr/libexec/yggdrasil-greeter-theme
 systemctl enable yggdrasil-greeter-theme.service
+chmod 0755 /usr/libexec/yggdrasil-grub-theme
+systemctl enable yggdrasil-grub-theme.service
 
 # ---------------------------------------------------------------- branding
 # Only the display name changes; ID/VARIANT stay Bazzite's so its update and

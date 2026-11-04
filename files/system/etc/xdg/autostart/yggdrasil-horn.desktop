@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Yggdrasil war horn
-Comment=Sounds the horn when you log in (turn off in System Settings → Autostart)
-Exec=sh -c 'sleep 2; pw-play --volume=0.6 /usr/share/sounds/yggdrasil/stereo/desktop-login.oga'
+Name=Yggdrasil login sound
+Comment=Plays the Mountain King chiptune when you log in (change with: yggdrasil-theme login-sound <chiptune|horn|off>)
+Exec=sh -c 'c="${XDG_CONFIG_HOME:-$HOME/.config}/yggdrasil"; [ -e "$c/login-sound-off" ] && exit 0; f="$c/login-sound.oga"; [ -e "$f" ] || f=/usr/share/sounds/yggdrasil/stereo/desktop-login.oga; sleep 2; pw-play --volume=0.6 "$f"'
 Icon=yggdrasil-logo
 OnlyShowIn=KDE;
 X-KDE-autostart-phase=2

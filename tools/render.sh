@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Regenerates every binary theme asset into files/system/.
-# Needs: python3 (+numpy for sounds), rsvg-convert, ImageMagick, ffmpeg.
+# Needs: python3 (+numpy, scipy, shapely, fonttools, pillow), grub2-mkfont (optional), rsvg-convert, ImageMagick, ffmpeg.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT=files/system
@@ -83,4 +83,7 @@ for f in "$TMP"/snd/*.wav; do
   n=$(basename "$f" .wav)
   ffmpeg -loglevel error -y -i "$f" -c:a libvorbis -q:a 5 -f ogg "$SND/$n.oga"
 done
+# ---- GRUB boot menu (installed onto /boot by yggdrasil-grub-theme.service)
+python3 tools/grub_theme.py "$TMP" "$ROOT/usr/share/yggdrasil/grub-theme"
+
 echo "assets rendered into $ROOT"

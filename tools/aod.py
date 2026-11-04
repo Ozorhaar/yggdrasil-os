@@ -9,8 +9,6 @@ import sys
 
 import art
 
-# the phone's rune set: no sowilo, tiwaz, algiz or othala; no jera (reads as sowilo when small)
-art.BAND_RUNES = [k for k in art.BAND_RUNES if k not in ("S", "Y")]
 AOD_GOLD = "#b08f50"
 
 

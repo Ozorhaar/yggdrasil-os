@@ -49,15 +49,22 @@ RUNES = {
     "N": (0.5, [[(0.25, 0.05), (0.25, 0.95)], [(0.05, 0.35), (0.45, 0.60)]]),  # naudiz
     "P": (0.6, [[(0.45, 0.05), (0.10, 0.25), (0.10, 0.75), (0.45, 0.95)],
                 [(0.10, 0.25), (0.45, 0.45)], [(0.10, 0.75), (0.45, 0.55)]]),  # perth
+    # medieval / Younger Futhark stand-ins used for the name, so Yggdrasil never
+    # needs jera or sowilo: dotted ur (y) and short-twig sol (s)
+    "UY": (0.6, [[(0.08, 0.95), (0.08, 0.05), (0.52, 0.30), (0.52, 0.95)],
+                 [(0.30, 0.58), (0.30, 0.62)]]),                       # dotted ur
+    "SS": (0.2, [[(0.10, 0.05), (0.10, 0.50)]]),                       # short-twig sol
     "E": (0.6, [[(0.08, 0.95), (0.08, 0.05), (0.30, 0.30), (0.52, 0.05), (0.52, 0.95)]]),  # ehwaz
     "M": (0.6, [[(0.08, 0.95), (0.08, 0.05), (0.52, 0.40)], [(0.52, 0.95), (0.52, 0.05), (0.08, 0.40)]]),  # mannaz
     "B": (0.55, [[(0.08, 0.05), (0.08, 0.95)], [(0.08, 0.05), (0.45, 0.27), (0.08, 0.50), (0.45, 0.73), (0.08, 0.95)]]),  # berkanan
 }
-NAME_RUNES = ["Y", "G", "G", "D", "R", "A", "S", "I", "L"]
-# A decorative band: the futhark letters minus a few that carry modern
-# political baggage when used alone (othala, tiwaz, algiz are left out).
-BAND_RUNES = ["F", "U", "TH", "A", "R", "K", "G", "W", "H", "N", "I", "Y",
-              "P", "S", "B", "E", "M", "L", "D"]
+NAME_RUNES = ["UY", "G", "G", "D", "R", "A", "SS", "I", "L"]   # ᚤᚷᚷᛞᚱᚨᛌᛁᛚ
+# A decorative band: the futhark minus sowilo, tiwaz, algiz and othala (modern
+# political baggage) and jera (reads as sowilo at small sizes).
+AVOID = ("S", "T", "Z", "O", "Y")
+BAND_RUNES = ["F", "U", "TH", "A", "R", "K", "G", "W", "H", "N", "I",
+              "P", "B", "E", "M", "L", "D"]
+assert not set(BAND_RUNES + NAME_RUNES) & set(AVOID)
 
 
 def rune_path(key, x, y, h):

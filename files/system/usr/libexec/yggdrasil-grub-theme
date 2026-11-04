@@ -1,0 +1,74 @@
+#!/usr/bin/bash
+# Puts the Yggdrasil boot-menu theme on /boot and points GRUB at it.
+#
+# The theme lives in the image (/usr/share/yggdrasil/grub-theme), but GRUB can
+# only read /boot, so this copies it to /boot/grub2/themes/yggdrasil and keeps
+# one marked block in /boot/grub2/custom.cfg. Both of Fedora's GRUB setups
+# (bootupd's static grub.cfg and the older generated one) source custom.cfg,
+# so grub.cfg itself is never touched. Anything else in custom.cfg is kept.
+# Runs at every boot but does nothing when the copy is already current.
+#
+# To remove it: delete the "yggdrasil boot theme" block from custom.cfg and
+# disable yggdrasil-grub-theme.service.
+set -euo pipefail
+SRC=/usr/share/yggdrasil/grub-theme
+G=/boot/grub2
+DST=$G/themes/yggdrasil
+CFG=$G/custom.cfg
+BEGIN='# >>> yggdrasil boot theme (managed by yggdrasil-grub-theme.service) >>>'
+END='# <<< yggdrasil boot theme <<<'
+
+[ -d "$SRC" ] && [ -f "$G/grub.cfg" ] || exit 0
+if ! grep -q 'custom\.cfg' "$G/grub.cfg"; then
+    echo "grub.cfg doesn't source custom.cfg; leaving the boot menu alone"
+    exit 0
+fi
+
+block() {
+    cat <<BLOCK
+$BEGIN
+if loadfont \$prefix/themes/yggdrasil/yggdrasil-runic-24.pf2; then
+  loadfont \$prefix/themes/yggdrasil/dejavu-sans-16.pf2
+  loadfont \$prefix/themes/yggdrasil/dejavu-sans-18.pf2
+  insmod all_video
+  insmod gfxterm
+  insmod png
+  set gfxmode=auto
+  terminal_output gfxterm
+  set theme=\$prefix/themes/yggdrasil/theme.txt
+  export theme
+fi
+$END
+BLOCK
+}
+
+current_block() {
+    [ -f "$CFG" ] && awk -v b="$BEGIN" -v e="$END" '$0==b{on=1} on{print} $0==e{on=0}' "$CFG"
+}
+
+if diff -rq "$SRC" "$DST" >/dev/null 2>&1 && [ "$(current_block)" = "$(block)" ]; then
+    exit 0
+fi
+
+# /boot may be mounted read-only; open it just for the copy
+remounted=0
+if ! touch "$G/.yggdrasil-rw-test" 2>/dev/null; then
+    mount -o remount,rw /boot
+    remounted=1
+fi
+rm -f "$G/.yggdrasil-rw-test"
+cleanup() { if [ "$remounted" = 1 ]; then mount -o remount,ro /boot || true; fi; }
+trap cleanup EXIT
+
+mkdir -p "$G/themes"
+rm -rf "$DST.new"
+cp -r "$SRC" "$DST.new"
+rm -rf "$DST"
+mv "$DST.new" "$DST"
+
+touch "$CFG"
+{ awk -v b="$BEGIN" -v e="$END" '$0==b{skip=1} !skip{print} $0==e{skip=0}' "$CFG"; block; } > "$CFG.new"
+chmod 0644 "$CFG.new"
+mv "$CFG.new" "$CFG"
+sync
+echo "Yggdrasil boot theme installed to $DST"
