@@ -15,6 +15,7 @@ const state = {
   demoStart: 0,
   paused: false,
   fps: 15,
+  calmFps: 5,             // still weather: clouds drift, water shimmers, stars twinkle (0 = one frame a minute)
   scale: 1,               // render resolution (0.5-1); lower = cheaper on big screens
   forced: null,           // preview only: {time, code, aurora}
 };
@@ -374,7 +375,8 @@ function tick() {
   requestAnimationFrame((ts) => {
     if (state.paused) return;
     const moving = draw(ts);
-    timer = setTimeout(tick, moving ? 1000 / state.fps : 60000);   // still sky: one frame a minute
+    const calm = state.calmFps > 0 ? 1000 / state.calmFps : 60000;
+    timer = setTimeout(tick, moving ? 1000 / state.fps : calm);
   });
 }
 function load(src) { return new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = src; }); }
@@ -387,6 +389,7 @@ function onMessage(m) {
     case "resume": state.paused = false; lastT = 0; break;
     case "demo": state.demoStart = Date.now(); break;
     case "fps": state.fps = clamp(m.fps | 0, 5, 30); break;
+    case "calm": state.calmFps = clamp(m.fps | 0, 0, 15); break;
     case "scale": state.scale = clamp(+m.scale || 1, 0.5, 1); resize(); break;
     default: return;
   }

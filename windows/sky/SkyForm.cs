@@ -126,6 +126,7 @@ internal sealed class SkyForm : Form
             {
                 ready = true;
                 Post(new { type = "fps", fps = settings.Fps });
+                Post(new { type = "calm", fps = settings.CalmFps });
                 Post(new { type = "scale", scale = settings.RenderScale });
                 SendWeather(weather.Last);
                 if (weather.Stale) SendWeather(await weather.Refresh());
