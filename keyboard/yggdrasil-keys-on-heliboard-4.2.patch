@@ -1,0 +1,484 @@
+From ce45e9182e745e070653d27083f43582791ac627 Mon Sep 17 00:00:00 2001
+From: Ozorhaar <jschmock@pm.me>
+Date: Tue, 3 Nov 2026 23:34:21 -0500
+Subject: [PATCH] Yggdrasil Keys: theme, runic font, no network, no backup,
+ signed CI
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FFr54TcQHNZw79uidc4Wfy
+---
+ .github/workflows/build-debug-apk.yml         | 39 ------------
+ .github/workflows/build-test-auto.yml         | 43 -------------
+ .github/workflows/yggdrasil-keys.yml          | 62 +++++++++++++++++++
+ YGGDRASIL.md                                  | 18 ++++++
+ app/build.gradle.kts                          | 24 +++++--
+ app/src/main/AndroidManifest.xml              | 11 +++-
+ .../keyboard/keyboard/KeyboardTheme.kt        | 18 ++++++
+ .../keyboard/keyboard/KeyboardTypeface.kt     | 19 +++++-
+ .../keyboard/emoji/SupportedEmojis.kt         |  2 +-
+ .../keyboard/latin/settings/Defaults.kt       |  6 +-
+ app/src/main/res/values/clip_provider.xml     |  2 +-
+ app/src/main/res/values/donottranslate.xml    |  2 +-
+ app/src/main/res/values/gesture_data.xml      |  2 +-
+ app/src/main/res/values/strings.xml           |  1 +
+ app/src/main/res/xml/ygg_no_backup.xml        | 27 ++++++++
+ 15 files changed, 178 insertions(+), 98 deletions(-)
+ delete mode 100644 .github/workflows/build-debug-apk.yml
+ delete mode 100644 .github/workflows/build-test-auto.yml
+ create mode 100644 .github/workflows/yggdrasil-keys.yml
+ create mode 100644 YGGDRASIL.md
+ create mode 100644 app/src/main/res/xml/ygg_no_backup.xml
+
+diff --git a/.github/workflows/build-debug-apk.yml b/.github/workflows/build-debug-apk.yml
+deleted file mode 100644
+index 5ae93944..00000000
+--- a/.github/workflows/build-debug-apk.yml
++++ /dev/null
+@@ -1,39 +0,0 @@
+-name: Build debug APK
+-
+-on:
+-  workflow_dispatch:
+-
+-jobs:
+-  build:
+-
+-    runs-on: ubuntu-latest
+-
+-    steps:
+-      - uses: actions/checkout@v4
+-
+-      - name: Set up JDK
+-        uses: actions/setup-java@v4
+-        with:
+-          java-version: '17'
+-          distribution: 'temurin'
+-
+-      - uses: gradle/actions/setup-gradle@v3
+-
+-      - name: Grant execute permission for gradlew
+-        run: chmod +x gradlew
+-
+-      - name: Build with Gradle
+-        run: ./gradlew assembleDebug
+-
+-      - name: Upload APK
+-        uses: actions/upload-artifact@v4
+-        with:
+-          name: HeliBoard-debug
+-          path: app/build/outputs/apk/debug/*-debug*.apk
+-
+-      - name: Archive reports for failed job
+-        uses: actions/upload-artifact@v4
+-        with:
+-          name: reports
+-          path: '*/build/reports'
+-        if: ${{ failure() }}
+diff --git a/.github/workflows/build-test-auto.yml b/.github/workflows/build-test-auto.yml
+deleted file mode 100644
+index a887aa5f..00000000
+--- a/.github/workflows/build-test-auto.yml
++++ /dev/null
+@@ -1,43 +0,0 @@
+-name: Test build
+-# builds only for a single abi and does not produce an APK
+-
+-on:
+-# disabled on push: when I push to non-main, I do a PR anyway
+-#  push:
+-    # don't run on main. I noticed I often don't push commits to avoid unnecessary workflow runs
+-#    branches-ignore: [ main ]
+-#    paths:
+-#      - 'app/**'
+-  pull_request:
+-    paths:
+-      - 'app/src/main/java**'
+-  workflow_dispatch:
+-
+-jobs:
+-  build:
+-
+-    runs-on: ubuntu-latest
+-
+-    steps:
+-      - uses: actions/checkout@v4
+-
+-      - name: Set up JDK
+-        uses: actions/setup-java@v4
+-        with:
+-          java-version: '17'
+-          distribution: 'temurin'
+-
+-      - uses: gradle/actions/setup-gradle@v3
+-
+-      - name: Grant execute permission for gradlew
+-        run: chmod +x gradlew
+-
+-      - name: Build with Gradle
+-        run: ./gradlew testRunTestsUnitTest
+-
+-      - name: Archive reports for failed job
+-        uses: actions/upload-artifact@v4
+-        with:
+-          name: reports
+-          path: '*/build/reports'
+-        if: ${{ failure() }}
+diff --git a/.github/workflows/yggdrasil-keys.yml b/.github/workflows/yggdrasil-keys.yml
+new file mode 100644
+index 00000000..d8a8703e
+--- /dev/null
++++ b/.github/workflows/yggdrasil-keys.yml
+@@ -0,0 +1,62 @@
++name: Yggdrasil Keys
++
++on:
++  push:
++    branches: [main]
++  workflow_dispatch:
++
++permissions:
++  contents: write
++
++jobs:
++  build:
++    runs-on: ubuntu-latest
++    steps:
++      # every action is pinned to an exact commit, so a moved tag can't change what runs here
++      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
++
++      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
++        with:
++          java-version: '17'
++          distribution: 'temurin'
++
++      # also verifies gradle-wrapper.jar against Gradle's published checksums
++      - uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
++
++      - name: Signing key
++        env:
++          KS: ${{ secrets.YGG_KEYSTORE_B64 }}
++        run: |
++          echo "$KS" | base64 -d > "$RUNNER_TEMP/ygg.p12"
++          echo "YGG_KEYSTORE=$RUNNER_TEMP/ygg.p12" >> "$GITHUB_ENV"
++
++      # "nouserlib": the build that can never load an outside native library
++      - name: Build
++        env:
++          YGG_KEYSTORE_PASSWORD: ${{ secrets.YGG_KEYSTORE_PASSWORD }}
++        run: |
++          chmod +x gradlew
++          ./gradlew :app:assembleNouserlib --no-daemon --stacktrace
++
++      - name: Security gate - no network, no contacts
++        run: |
++          APK=$(ls app/build/outputs/apk/nouserlib/*.apk | head -1)
++          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
++          "$AAPT2" dump permissions "$APK" | tee permissions.txt
++          if grep -E "android.permission.(INTERNET|ACCESS_NETWORK_STATE|ACCESS_WIFI_STATE|READ_CONTACTS|CHANGE_NETWORK_STATE)" permissions.txt; then
++            echo "::error::Yggdrasil Keys must never ask for network or contacts access"; exit 1
++          fi
++          "$AAPT2" dump badging "$APK" | grep -E "^package:"
++          sha256sum "$APK" | tee "$APK.sha256"
++          echo "APK=$APK" >> "$GITHUB_ENV"
++
++      - uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2.3.2
++        with:
++          tag_name: keys-v4.2.${{ github.run_number }}
++          name: Yggdrasil Keys 4.2-ygg.${{ github.run_number }}
++          body: |
++            HeliBoard 4.2 with the Yggdrasil theme and runic letters. No network permission (checked by the build).
++            SHA-256 is attached alongside the APK.
++          files: |
++            ${{ env.APK }}
++            ${{ env.APK }}.sha256
+diff --git a/YGGDRASIL.md b/YGGDRASIL.md
+new file mode 100644
+index 00000000..ee2360cc
+--- /dev/null
++++ b/YGGDRASIL.md
+@@ -0,0 +1,18 @@
++# Yggdrasil Keys
++
++A personal build of [HeliBoard](https://github.com/Helium314/HeliBoard) (GPL-3.0) with the Yggdrasil theme.
++
++Changes from upstream HeliBoard 4.2:
++
++- **Look**: "Yggdrasil" colour theme (night, gold, bone) is the default day and night; key labels use the
++  carved *Yggdrasil Runic* font unless you load your own font; rune-band background; key borders on.
++- **No network, ever**: `INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE` are stripped with
++  `tools:node="remove"`, so Android blocks network access even if a library asked for it. CI fails the
++  build if any of them (or `READ_CONTACTS`) shows up in the APK.
++- **Nothing leaves the phone**: Android backup and phone-to-phone transfer are off for all app data.
++- **No outside native code**: built as `nouserlib`, which cannot load a user-supplied gesture library.
++- **Own identity**: package `com.ozorhaar.yggdrasil.keys` and provider authorities, so it installs next to HeliBoard.
++- **Supply chain**: GitHub Actions pinned to commit SHAs; Gradle wrapper checksum verified; APK signed with the
++  Yggdrasil key; SHA-256 published with each release.
++
++Updating from upstream: `git fetch upstream --tags && git rebase vX.Y` then fix any conflicts in the files above.
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index 0d4dcaf5..683757e4 100755
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -10,11 +10,12 @@ android {
+     compileSdk = 37
+ 
+     defaultConfig {
+-        applicationId = "helium314.keyboard"
++        applicationId = "com.ozorhaar.yggdrasil.keys"
+         minSdk = 21
+         targetSdk = 37
+-        versionCode = 4201
+-        versionName = "4.2"
++        // Yggdrasil Keys: HeliBoard 4.2 + theme; CI run number keeps every build newer
++        versionCode = 420100 + (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0)
++        versionName = "4.2-ygg." + (System.getenv("GITHUB_RUN_NUMBER") ?: "dev")
+         ndk {
+             abiFilters.clear()
+             abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
+@@ -22,6 +23,20 @@ android {
+         proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+     }
+ 
++    signingConfigs {
++        // CI signs with the same private key as the Yggdrasil launcher (kept in GitHub secrets / the Mac)
++        create("ygg") {
++            val ks = System.getenv("YGG_KEYSTORE")
++            if (ks != null) {
++                storeFile = file(ks)
++                storeType = "PKCS12"
++                storePassword = System.getenv("YGG_KEYSTORE_PASSWORD")
++                keyAlias = "yggdrasil"
++                keyPassword = System.getenv("YGG_KEYSTORE_PASSWORD")
++            }
++        }
++    }
++
+     buildTypes {
+         release {
+             isMinifyEnabled = true
+@@ -30,6 +45,7 @@ android {
+             isJniDebuggable = false
+         }
+         create("nouserlib") { // same as release, but does not allow the user to provide a library
++            if (System.getenv("YGG_KEYSTORE") != null) signingConfig = signingConfigs.getByName("ygg")
+             isMinifyEnabled = true
+             isShrinkResources = false
+             isDebuggable = false
+@@ -66,7 +82,7 @@ android {
+             }
+             variant.outputs.forEach { output ->
+                 if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
+-                    output.outputFileName = "HeliBoard_${defaultConfig.versionName}-${variant.buildType}.apk"
++                    output.outputFileName = "YggdrasilKeys_${defaultConfig.versionName}.apk"
+                 }
+             }
+         }
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+index d50a3c96..aa834c12 100644
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
+@@ -12,14 +12,21 @@ SPDX-License-Identifier: Apache-2.0 AND GPL-3.0-only
+     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+     <uses-permission android:name="android.permission.VIBRATE" />
+     <uses-permission android:name="android.permission.WRITE_USER_DICTIONARY" />
+-    <uses-permission android:name="android.permission.READ_CONTACTS" />
++    <!-- Yggdrasil Keys: never on the network, never reads contacts. tools:node="remove" strips these
++         even if a library tries to add them, so Android itself blocks any network access. -->
++    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
++    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
++    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" tools:node="remove" />
++    <uses-permission android:name="android.permission.READ_CONTACTS" tools:node="remove" />
+ 
+     <application android:label="@string/english_ime_name"
+             android:name="helium314.keyboard.latin.App"
+             android:icon="@mipmap/ic_launcher"
+             android:roundIcon="@mipmap/ic_launcher_round"
+             android:supportsRtl="true"
+-            android:allowBackup="true"
++            android:allowBackup="false"
++            android:fullBackupContent="false"
++            android:dataExtractionRules="@xml/ygg_no_backup"
+             android:defaultToDeviceProtectedStorage="true"
+             android:directBootAware="true"
+             android:enableOnBackInvokedCallback="true"
+diff --git a/app/src/main/java/helium314/keyboard/keyboard/KeyboardTheme.kt b/app/src/main/java/helium314/keyboard/keyboard/KeyboardTheme.kt
+index 7bb42bdc..1e98e4e6 100644
+--- a/app/src/main/java/helium314/keyboard/keyboard/KeyboardTheme.kt
++++ b/app/src/main/java/helium314/keyboard/keyboard/KeyboardTheme.kt
+@@ -65,7 +65,9 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
+         const val THEME_PINK = "pink"
+         const val THEME_SAND = "sand"
+         const val THEME_VIOLETTE = "violette"
++        const val THEME_YGGDRASIL = "yggdrasil"
+         fun getAvailableDefaultColors(prefs: SharedPreferences, isNight: Boolean) = listOfNotNull(
++            THEME_YGGDRASIL,
+             if (!isNight) THEME_LIGHT else null, THEME_DARK,
+             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) THEME_DYNAMIC else null,
+             if (prefs.getString(Settings.PREF_THEME_STYLE, Defaults.PREF_THEME_STYLE) == STYLE_HOLO) THEME_HOLO_WHITE else null,
+@@ -336,6 +338,22 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
+                     Color.WHITE,
+                     keyboardBackground = backgroundImage
+                 )
++                THEME_YGGDRASIL -> DefaultColors(
++                    themeStyle,
++                    hasBorders,
++                    "#C8A25A".toColorInt(),   // accent: gold
++                    "#0B1220".toColorInt(),   // background: night
++                    "#1B2436".toColorInt(),   // keys
++                    "#2A2F36".toColorInt(),   // functional keys: iron
++                    "#1B2436".toColorInt(),   // space bar
++                    "#E8DCC4".toColorInt(),   // key letters: bone
++                    "#C8A25A".toColorInt(),   // hint letters: gold
++                    suggestionText = "#ECD08F".toColorInt(),
++                    spaceBarText = "#96918A".toColorInt(),
++                    gesture = "#ECD08F".toColorInt(),
++                    keyboardBackground = backgroundImage
++                        ?: ContextCompat.getDrawable(context, R.drawable.ygg_keyboard_bg)
++                )
+                 else -> { // user-defined theme
+                     val colorSettings = readUserColors(prefs, themeName)
+                     val colors = readUserColorTheme(themeStyle, hasBorders, colorSettings, context, isNight, backgroundImage)
+diff --git a/app/src/main/java/helium314/keyboard/keyboard/KeyboardTypeface.kt b/app/src/main/java/helium314/keyboard/keyboard/KeyboardTypeface.kt
+index d2f8d18c..11604bc6 100644
+--- a/app/src/main/java/helium314/keyboard/keyboard/KeyboardTypeface.kt
++++ b/app/src/main/java/helium314/keyboard/keyboard/KeyboardTypeface.kt
+@@ -21,10 +21,23 @@ object KeyboardTypeface {
+     @Volatile
+     private var emojiTypefaceLoaded = false
+ 
++    private fun loadUserTypeface(context: Context): Typeface? {
++        val file = Settings.getCustomFontFile(context)
++        if (!file.exists()) return null
++        return runCatching { Typeface.createFromFile(file) }.getOrNull()
++    }
++
++    /** Yggdrasil Keys: a font the user loaded wins; otherwise the carved Yggdrasil Runic letters. */
+     private fun loadCustomTypeface(context: Context): Typeface? {
+-        return runCatching {
+-            Typeface.createFromFile(Settings.getCustomFontFile(context))
+-        }.getOrNull()
++        return loadUserTypeface(context)
++            ?: runCatching { Typeface.createFromAsset(context.assets, "fonts/yggdrasil_runic.ttf") }.getOrNull()
++    }
++
++    /** Only a font file the user loaded (used for the emoji support check, which the runic font would fool). */
++    @JvmStatic
++    fun userFontTypeface(): Typeface? {
++        val context = Settings.getCurrentContext() ?: return null
++        return loadUserTypeface(context)
+     }
+ 
+     private fun loadCustomEmojiTypeface(context: Context): Typeface? {
+diff --git a/app/src/main/java/helium314/keyboard/keyboard/emoji/SupportedEmojis.kt b/app/src/main/java/helium314/keyboard/keyboard/emoji/SupportedEmojis.kt
+index 109a7251..89cb2ccd 100644
+--- a/app/src/main/java/helium314/keyboard/keyboard/emoji/SupportedEmojis.kt
++++ b/app/src/main/java/helium314/keyboard/keyboard/emoji/SupportedEmojis.kt
+@@ -28,7 +28,7 @@ object SupportedEmojis {
+         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+         if (context.prefs().contains(Settings.PREF_EMOJI_MAX_SDK)) return
+         val paint = Paint()
+-        (KeyboardTypeface.emojiTypeface() ?: KeyboardTypeface.customTypeface())
++        (KeyboardTypeface.emojiTypeface() ?: KeyboardTypeface.userFontTypeface())
+             ?.let { paint.setTypeface(it) }
+         val maxApi = context.assets.open("emoji/minApi.txt").reader().readLines().maxOf {
+             val s = it.split(" ")
+diff --git a/app/src/main/java/helium314/keyboard/latin/settings/Defaults.kt b/app/src/main/java/helium314/keyboard/latin/settings/Defaults.kt
+index b5fd76eb..ec8af053 100644
+--- a/app/src/main/java/helium314/keyboard/latin/settings/Defaults.kt
++++ b/app/src/main/java/helium314/keyboard/latin/settings/Defaults.kt
+@@ -47,9 +47,9 @@ object Defaults {
+     const val PREF_THEME_STYLE = KeyboardTheme.STYLE_MATERIAL
+     fun PREF_ICON_STYLE(prefs: SharedPreferences) = prefs.getString(Settings.PREF_THEME_STYLE, PREF_THEME_STYLE)!!
+     const val PREF_ACCENT_SHIFTED_ICON = false
+-    const val PREF_THEME_COLORS = KeyboardTheme.THEME_LIGHT
+-    const val PREF_THEME_COLORS_NIGHT = KeyboardTheme.THEME_DARK
+-    const val PREF_THEME_KEY_BORDERS = false
++    const val PREF_THEME_COLORS = KeyboardTheme.THEME_YGGDRASIL
++    const val PREF_THEME_COLORS_NIGHT = KeyboardTheme.THEME_YGGDRASIL
++    const val PREF_THEME_KEY_BORDERS = true
+     @JvmField
+     val PREF_THEME_DAY_NIGHT = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+     const val PREF_CUSTOM_ICON_NAMES = ""
+diff --git a/app/src/main/res/values/clip_provider.xml b/app/src/main/res/values/clip_provider.xml
+index 6c679f8d..28832a06 100644
+--- a/app/src/main/res/values/clip_provider.xml
++++ b/app/src/main/res/values/clip_provider.xml
+@@ -1,4 +1,4 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="clipboard_provider_authority" translatable="false">helium314.keyboard.clipprovider</string>
++    <string name="clipboard_provider_authority" translatable="false">com.ozorhaar.yggdrasil.keys.clipprovider</string>
+ </resources>
+diff --git a/app/src/main/res/values/donottranslate.xml b/app/src/main/res/values/donottranslate.xml
+index 5a7f4e50..ddf7bd91 100644
+--- a/app/src/main/res/values/donottranslate.xml
++++ b/app/src/main/res/values/donottranslate.xml
+@@ -70,7 +70,7 @@
+     <!-- Description for Hebrew 2 subtype. -->
+     <string name="subtype_hebrew_1452_2" translatable="false">%s (1452-2)</string>
+ 
+-    <string name="english_ime_name" translatable="false">HeliBoard</string>
++    <string name="english_ime_name" translatable="false">Yggdrasil Keys</string>
+     <!-- App slogan-->
+     <string name="app_slogan" translatable="false">100% FOSS keyboard, based on AOSP.</string>
+ 
+diff --git a/app/src/main/res/values/gesture_data.xml b/app/src/main/res/values/gesture_data.xml
+index de6c7786..f0e862bd 100644
+--- a/app/src/main/res/values/gesture_data.xml
++++ b/app/src/main/res/values/gesture_data.xml
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="gesture_data_provider_authority" translatable="false">helium314.keyboard.provider</string>
++    <string name="gesture_data_provider_authority" translatable="false">com.ozorhaar.yggdrasil.keys.provider</string>
+     <string name="gesture_data_directory" translatable="false">gesture_data</string>
+     <string name="gesture_data_json" translatable="false">heliboard_data.gestures.json</string>
+     <string name="gesture_data_zip" translatable="false">gesture_data.zip</string>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 89ff532e..67267962 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -755,6 +755,7 @@ New dictionary:
+     <string name="theme_name_sand" tools:keep="@string/theme_name_sand">Sand</string>
+     <!-- Theme name for violette theme -->
+     <string name="theme_name_violette" tools:keep="@string/theme_name_violette">Violette</string>
++    <string name="theme_name_yggdrasil" tools:keep="@string/theme_name_yggdrasil" translatable="false">Yggdrasil</string>
+     <!-- Theme name for user-defined theme -->
+     <string name="theme_name_user" tools:keep="@string/theme_name_user">User-Defined</string>
+     <!-- Theme name for user-defined theme night mode theme -->
+diff --git a/app/src/main/res/xml/ygg_no_backup.xml b/app/src/main/res/xml/ygg_no_backup.xml
+new file mode 100644
+index 00000000..f03bafc8
+--- /dev/null
++++ b/app/src/main/res/xml/ygg_no_backup.xml
+@@ -0,0 +1,27 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Yggdrasil Keys: learned words, dictionaries and clipboard never leave the phone,
++     not to the cloud and not in a phone-to-phone transfer. -->
++<data-extraction-rules>
++    <cloud-backup>
++        <exclude domain="root" path="." />
++        <exclude domain="file" path="." />
++        <exclude domain="database" path="." />
++        <exclude domain="sharedpref" path="." />
++        <exclude domain="external" path="." />
++        <exclude domain="device_root" path="." />
++        <exclude domain="device_file" path="." />
++        <exclude domain="device_database" path="." />
++        <exclude domain="device_sharedpref" path="." />
++    </cloud-backup>
++    <device-transfer>
++        <exclude domain="root" path="." />
++        <exclude domain="file" path="." />
++        <exclude domain="database" path="." />
++        <exclude domain="sharedpref" path="." />
++        <exclude domain="external" path="." />
++        <exclude domain="device_root" path="." />
++        <exclude domain="device_file" path="." />
++        <exclude domain="device_database" path="." />
++        <exclude domain="device_sharedpref" path="." />
++    </device-transfer>
++</data-extraction-rules>
+-- 
+2.43.0
+
