@@ -31,7 +31,7 @@ def reverb(x, mix=0.3):
     return out
 
 
-def horn(freqs, dur, t_split=None):
+def horn(freqs, dur, t_split=None, attack=0.18, release=0.6):
     """Brass-like horn: harmonic stack, gliding pitch, vibrato, breathy noise."""
     n = int(dur * SR)
     t = np.arange(n) / SR
@@ -45,7 +45,7 @@ def horn(freqs, dur, t_split=None):
         x += amp * np.sin(h * ph)
     x += 0.02 * np.random.default_rng(1).standard_normal(n) * brightness
     x = np.tanh(1.6 * x)
-    return x * env(n, 0.18, 0.6)
+    return x * env(n, attack, min(release, dur))
 
 
 def anvil(f0=620, dur=1.6, bright=1.0):

@@ -97,9 +97,12 @@ def transpose(n, octaves):
     return n[:-1] + str(int(n[-1]) + octaves) if n else n
 
 
-def render(out):
+FULL_PLAN = [(96, 104, 0), (108, 128, 1), (132, 160, 2), (164, 196, 3), (200, 232, 4)]
+
+
+def render(out, plan=None, ending=True):
     # each cycle: (bpm start, bpm end, intensity 0..4)
-    plan = [(96, 104, 0), (108, 128, 1), (132, 160, 2), (164, 196, 3), (200, 232, 4)]
+    plan = plan or FULL_PLAN
     tracks = []
     for bpm0, bpm1, level in plan:
         bars = [bar for sec in CYCLE for bar in zip(*sec)]
@@ -142,9 +145,10 @@ def render(out):
                         drums[s + j * q:s + n] += noise(n - j * q, 140, 0.07)[: n - j * q]
             tracks.append(lead + harm + low + drums)
     # ending: three big stabs and a crash
-    beat = 60 / 232
-    for notes, beats in ((["B3", "F#4", "B4", "B2"], 1), (["B3", "F#4", "B4", "B2"], 1),
-                         (["B3", "D4", "F#4", "B1"], 3)):
+    beat = 60 / plan[-1][1]
+    stabs = ((["B3", "F#4", "B4", "B2"], 1), (["B3", "F#4", "B4", "B2"], 1),
+             (["B3", "D4", "F#4", "B1"], 3)) if ending else ()
+    for notes, beats in stabs:
         n = int(beats * beat * SR)
         hit = sum(pulse(freq(x), n, 0.25, 0.3, decay=1.5) for x in notes[:3])
         hit += triangle(freq(notes[3]), n, 0.8, gate=0.9)
