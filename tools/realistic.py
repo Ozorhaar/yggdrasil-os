@@ -13,6 +13,7 @@ import subprocess
 import sys
 
 import numpy as np
+from scipy.ndimage import maximum_filter1d
 from scipy.signal import butter, resample_poly, sosfilt
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -122,6 +123,24 @@ def phone_bass(x, amount=0.7):
     return sosfilt(butter(4, 90, "high", fs=SR, output="sos"), y)
 
 
+def limit(x, ceiling_db=-12.0, look=0.004, release=0.08):
+    """Look-ahead peak limiter: gain never lets |x| exceed the ceiling (relative to the peak),
+    reaches its target before the spike arrives and recovers smoothly afterwards."""
+    x = x / (np.abs(x).max() + 1e-12)
+    c = 10 ** (ceiling_db / 20)
+    n = int(look * SR)
+    pk = maximum_filter1d(np.abs(x), size=2 * n + 1)          # peak over the look-ahead window
+    g = np.minimum(1.0, c / (pk + 1e-12))
+    a = np.exp(-1 / (release * SR))
+    out = np.empty_like(g); prev = 1.0
+    for i, v in enumerate(g):                                   # instant attack, smooth release
+        prev = v if v < prev else a * prev + (1 - a) * v
+        out[i] = prev
+    k = np.ones(n) / n                                          # smooth the gain to avoid clicks
+    out = np.minimum(out, np.convolve(out, k, "same"))
+    return x * out
+
+
 def room(x, wet=0.18, size=0.06):
     """A little stone-hall air: a few soft early reflections."""
     out = x.copy()
@@ -152,7 +171,8 @@ def mjolnir():
     th = load(38245)
     t0 = hits(th, thresh_db=-20, jump_db=6)[0]
     thunder = fade(cut(th, t0, 2.4, pre=0.02), fout=1.2)
-    return mix((0.0, norm(a, 1.0)), (0.12, norm(lp(thunder, 6000), 0.85)))
+    # shave the strike's spike so the ring and the thunder come up to the other sounds' level
+    return limit(mix((0.0, norm(a, 1.0)), (0.12, norm(lp(thunder, 6000), 0.85))), -12)
 
 
 def ravens():
@@ -185,7 +205,7 @@ def rune_stone():
     """Casting the bones: a handful tumbling into a tray, pitched down for heavier pieces."""
     y = load(703007)
     x = fade(cut(y, hits(y)[0], 1.15), fout=0.45)
-    return room(lp(pitch(x, -3), 9000), wet=0.22, size=0.04)
+    return limit(room(lp(pitch(x, -3), 9000), wet=0.22, size=0.04), -12)
 
 
 def war_drums():
