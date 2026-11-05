@@ -8,6 +8,7 @@ freesound.py) and every source is listed in SOURCES, which also writes OUTDIR/CR
 All CC0 unless noted. Personal use. The synthesised originals stay in phone_sounds.py.
 """
 import json
+import re
 import os
 import subprocess
 import sys
@@ -152,15 +153,41 @@ def room(x, wet=0.18, size=0.06):
     return out
 
 
-def write(path, x, peak=0.9):
+# Samsung's own sounds measure about -20.5 LUFS (notifications) and -18.5 LUFS (ringtones).
+# Matching them is what makes the phone's volume slider behave: it scales whatever level the
+# file has, so a file mastered 10 dB hotter than stock still sounds like "full volume" at 5/15.
+LUFS = {"Notifications": -20.0, "Ringtones": -18.0, "Alarms": -16.0}
+
+
+def loudness(x):
+    """Integrated loudness (EBU R128 / LUFS) of a mono signal as it is saved, i.e. on both channels
+    (R128 sums the channels, so the stereo file reads 3 dB above the mono signal)."""
+    m = (np.clip(x, -1, 1) * 32767).astype(np.int16)
+    st = np.stack([m, m], 1)
+    out = subprocess.run([FFMPEG, "-hide_banner", "-nostats", "-f", "s16le", "-ar", str(SR), "-ac", "2", "-i", "-",
+                          "-af", "ebur128", "-f", "null", "-"], input=st.tobytes(), capture_output=True).stderr.decode()
+    tail = out[out.rfind("Integrated loudness"):]
+    return float(re.search(r"I:\s+(-?[0-9.]+) LUFS", tail).group(1))
+
+
+def write(path, x, peak=0.9, lufs=None):
+    """Encode to ogg. With lufs (or a Notifications/Ringtones/Alarms folder in the path) the
+    sound is set to that loudness instead of to a peak level, never above the peak ceiling."""
+    if lufs is None:
+        lufs = next((v for k, v in LUFS.items() if f"{os.sep}{k}{os.sep}" in f"{os.sep}{path}"), None)
     x = norm(x, peak)
+    if lufs is not None:
+        x = x * 10 ** ((lufs - loudness(x)) / 20)
+        if np.abs(x).max() > peak:            # never push peaks past the ceiling to hit a target
+            x = norm(x, peak)
     st = (np.stack([x, x], 1) * 32767).astype(np.int16)
     title = os.path.splitext(os.path.basename(path))[0]
     os.makedirs(os.path.dirname(path), exist_ok=True)
     subprocess.run([FFMPEG, "-loglevel", "error", "-y", "-f", "s16le", "-ar", str(SR), "-ac", "2", "-i", "-",
                     "-c:a", "libvorbis", "-q:a", "6", "-metadata", f"title={title}", "-metadata", "artist=Yggdrasil", path],
                    input=st.tobytes(), check=True)
-    print(f"{os.path.relpath(path)}: {len(x) / SR:.2f}s")
+    lvl = f", {lufs:.0f} LUFS" if lufs is not None else ""
+    print(f"{os.path.relpath(path)}: {len(x) / SR:.2f}s{lvl}")
 
 
 # ------------------------------------------------------------------ the sounds
