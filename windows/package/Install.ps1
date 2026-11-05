@@ -390,6 +390,18 @@ Set-ItemProperty $p -Name ColorPrevalence -Value 0 -Type DWord
 Set-ItemProperty 'HKCU:\Software\Microsoft\Windows\DWM' -Name ColorPrevalence -Value 0 -Type DWord
 
 Start-Process -FilePath $themeFile      # Windows applies it and opens Settings > Themes
+Start-Sleep -Seconds 3
+
+# Pointers: set them the way the Mouse control panel does. A .theme file sets the files but
+# leaves "Scheme Source" on the Windows default, so Windows later reloads its own pointers.
+if (-not $NoCursors) {
+    $c = 'HKCU:\Control Panel\Cursors'
+    foreach ($r in $roles) { Set-ItemProperty $c -Name $r -Value $cursorPath[$r] }
+    Set-ItemProperty $c -Name '(default)' -Value 'Yggdrasil'
+    Set-ItemProperty $c -Name 'Scheme Source' -Value 1 -Type DWord        # 1 = a user scheme
+    Add-Type -Namespace Ygg -Name Spi -MemberDefinition '[DllImport("user32.dll")] public static extern bool SystemParametersInfo(uint a, uint b, System.IntPtr c, uint d);'
+    [void][Ygg.Spi]::SystemParametersInfo(0x57, 0, [IntPtr]::Zero, 3)  # SPI_SETCURSORS, save + broadcast
+}
 Start-Sleep -Seconds 2
 Start-Process ie4uinit.exe -ArgumentList '-show' -Wait -WindowStyle Hidden   # refresh Explorer's icon cache (per-user)
 
