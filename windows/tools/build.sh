@@ -39,6 +39,11 @@ cp windows/sky/assets/yggdrasil.ico "$T/yggdrasil.ico"
 # ---- sounds
 rm -rf "$T/Sounds"; python3 windows/tools/win_sounds.py "$T/Sounds"
 
+# ---- cursors and shield icons
+rm -rf "$T/Cursors" "$T/Icons"
+python3 windows/tools/win_cursors.py "$T/Cursors"
+python3 windows/tools/win_icons.py "$T/Icons"
+
 # ---- font (shared with Yggdrasil OS)
 mkdir -p "$T/Fonts"
 cp files/system/usr/share/fonts/yggdrasil/YggdrasilRunic.ttf "$T/Fonts/"

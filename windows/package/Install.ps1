@@ -23,9 +23,11 @@
 .PARAMETER NoSounds     Skip the sound scheme.
 .PARAMETER NoLockScreen Leave the lock screen alone.
 .PARAMETER NoTerminal   Skip the Windows Terminal profile.
+.PARAMETER NoCursors    Keep your current mouse pointers.
+.PARAMETER NoFolderIcons Leave Documents, Downloads, Pictures, Music and Videos with their usual icons.
 #>
 [CmdletBinding()]
-param([switch]$NoSky, [switch]$NoSounds, [switch]$NoLockScreen, [switch]$NoTerminal)
+param([switch]$NoSky, [switch]$NoSounds, [switch]$NoLockScreen, [switch]$NoTerminal, [switch]$NoCursors, [switch]$NoFolderIcons)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -82,25 +84,32 @@ trap {
     break
 }
 
-# --------------------------------------------------------------------- 2. backup (first install only)
-if (-not (Test-Path (Join-Path $Backup 'done'))) {
-    Say "Backing up your current settings to $Backup"
-    $keys = @{
-        'AppEvents'   = 'HKCU\AppEvents\Schemes'
-        'Desktop'     = 'HKCU\Control Panel\Desktop'
-        'Cursors'     = 'HKCU\Control Panel\Cursors'
-        'Personalize' = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
-        'DWM'         = 'HKCU\Software\Microsoft\Windows\DWM'
-        'Accent'      = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Accent'
-    }
-    foreach ($k in $keys.GetEnumerator()) {
-        # Start-Process: reg.exe writes to stderr, which PowerShell 5.1 would treat as an error
-        Start-Process reg.exe -ArgumentList 'export', "`"$($k.Value)`"", "`"$(Join-Path $Backup "$($k.Key).reg")`"", '/y' -Wait -WindowStyle Hidden
-    }
-    $cur = Get-ItemPropertyValue 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes' -Name CurrentTheme -ErrorAction SilentlyContinue
-    if ($cur) { Set-Content -LiteralPath (Join-Path $Backup 'CurrentTheme.txt') -Value $cur -Encoding UTF8 }
-    Set-Content -LiteralPath (Join-Path $Backup 'done') -Value (Get-Date -Format o)
+# --------------------------------------------------------------------- 2. backup
+# Each item is saved the first time any version of the installer is about to change it,
+# so the backup always holds your settings from before Yggdrasil.
+$keys = [ordered]@{
+    'AppEvents'   = 'HKCU\AppEvents\Schemes'
+    'Desktop'     = 'HKCU\Control Panel\Desktop'
+    'Cursors'     = 'HKCU\Control Panel\Cursors'
+    'Personalize' = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+    'DWM'         = 'HKCU\Software\Microsoft\Windows\DWM'
+    'Accent'      = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Accent'
+    'DesktopIcons'= 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\CLSID'
 }
+foreach ($k in $keys.GetEnumerator()) {
+    $file = Join-Path $Backup "$($k.Key).reg"
+    if (Test-Path -LiteralPath $file) { continue }
+    Say "Backing up $($k.Key) settings to $Backup"
+    # Start-Process: reg.exe writes to stderr, which PowerShell 5.1 would treat as an error
+    Start-Process reg.exe -ArgumentList 'export', "`"$($k.Value)`"", "`"$file`"", '/y' -Wait -WindowStyle Hidden
+    if (-not (Test-Path -LiteralPath $file)) { Set-Content -LiteralPath $file -Value 'Windows Registry Editor Version 5.00' -Encoding Unicode }  # key didn't exist
+}
+$curFile = Join-Path $Backup 'CurrentTheme.txt'
+if (-not (Test-Path -LiteralPath $curFile)) {
+    $cur = Get-ItemPropertyValue 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes' -Name CurrentTheme -ErrorAction SilentlyContinue
+    if ($cur) { Set-Content -LiteralPath $curFile -Value $cur -Encoding UTF8 }
+}
+Set-Content -LiteralPath (Join-Path $Backup 'done') -Value (Get-Date -Format o)
 
 # --------------------------------------------------------------------- 3. copy files
 Say "Copying the theme"
@@ -234,10 +243,48 @@ Write-Host ''; Write-Host '   ᚨ ᛚ ᛚ ᚠ ᚨ ᚦ ᛖ ᚱ' -ForegroundColor 
     [IO.File]::WriteAllText((Join-Path $frag 'yggdrasil.json'), ($json | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding $false))
 }
 
+# --------------------------------------------------------------------- 4e. cursors
+$Cursors = Join-Path $Theme 'Cursors'
+$roles = 'Arrow','Help','AppStarting','Wait','Crosshair','IBeam','NWPen','No','SizeNS','SizeWE','SizeNWSE','SizeNESW','SizeAll','UpArrow','Hand','Pin','Person'
+$cursorPath = @{}
+foreach ($r in $roles) {
+    $f = Get-ChildItem -LiteralPath $Cursors -Filter "Yggdrasil $r.*" | Select-Object -First 1
+    $cursorPath[$r] = $f.FullName
+}
+if (-not $NoCursors) {
+    Say "Registering the Yggdrasil pointer scheme"
+    Ensure-Key 'HKCU:\Control Panel\Cursors\Schemes'
+    Set-ItemProperty 'HKCU:\Control Panel\Cursors\Schemes' -Name 'Yggdrasil' -Value (($roles | ForEach-Object { $cursorPath[$_] }) -join ',')
+}
+
+# --------------------------------------------------------------------- 4f. folder icons
+$Icons = Join-Path $Theme 'Icons'
+. (Join-Path $Theme 'Set-FolderIcon.ps1')          # Set-YggdrasilFolderIcon, shared with the helper
+if (-not $NoFolderIcons) {
+    Say "Carving shields onto Documents, Downloads, Pictures, Music and Videos"
+    $shell = New-Object -ComObject Shell.Application
+    $folders = [ordered]@{
+        'Documents' = [Environment]::GetFolderPath('MyDocuments')
+        'Downloads' = $shell.NameSpace('shell:Downloads').Self.Path
+        'Pictures'  = [Environment]::GetFolderPath('MyPictures')
+        'Music'     = [Environment]::GetFolderPath('MyMusic')
+        'Videos'    = [Environment]::GetFolderPath('MyVideos')
+    }
+    foreach ($f in $folders.GetEnumerator()) {
+        if ($f.Value -and (Test-Path -LiteralPath $f.Value)) {
+            try { Set-YggdrasilFolderIcon -Path $f.Value -Icon $f.Key -Backup $Backup }
+            catch { Say "Couldn't set the icon on $($f.Value): $($_.Exception.Message)" 'Yellow' }
+        }
+    }
+}
+
 # --------------------------------------------------------------------- 5. theme file
 Say "Writing and applying Yggdrasil.theme"
 $themeFile = Join-Path $Theme 'Yggdrasil.theme'
 $soundLine = if ($NoSounds) { '' } else { "[Sounds]`r`nSchemeName=Yggdrasil`r`n" }
+$cursorLines = if ($NoCursors) { '' } else {
+    "[Control Panel\Cursors]`r`n" + (($roles | ForEach-Object { "$_=$($cursorPath[$_])" }) -join "`r`n") + "`r`nDefaultValue=Yggdrasil`r`n"
+}
 @"
 ; Yggdrasil for Windows 11 - generated by Install.ps1
 [Theme]
@@ -260,6 +307,20 @@ SystemMode=Dark
 AppMode=Dark
 
 $soundLine
+$cursorLines
+[CLSID\{20D04FE0-3AEA-1069-A2D8-08002B30309D}\DefaultIcon]
+DefaultValue=$Icons\This PC.ico,0
+
+[CLSID\{59031A47-3F72-44A7-89C5-5595FE6B30EE}\DefaultIcon]
+DefaultValue=$Icons\User.ico,0
+
+[CLSID\{F02C1A0D-BE21-4350-88B0-7367FC96EF3C}\DefaultIcon]
+DefaultValue=$Icons\Network.ico,0
+
+[CLSID\{645FF040-5081-101B-9F08-00AA002F954E}\DefaultIcon]
+Full=$Icons\Recycle Bin Full.ico,0
+Empty=$Icons\Recycle Bin Empty.ico,0
+
 [MasterThemeSelector]
 MTSM=RJSPBS
 "@ | Set-Content -LiteralPath $themeFile -Encoding Unicode
@@ -272,6 +333,8 @@ Set-ItemProperty $p -Name ColorPrevalence -Value 0 -Type DWord
 Set-ItemProperty 'HKCU:\Software\Microsoft\Windows\DWM' -Name ColorPrevalence -Value 0 -Type DWord
 
 Start-Process -FilePath $themeFile      # Windows applies it and opens Settings > Themes
+Start-Sleep -Seconds 2
+Start-Process ie4uinit.exe -ArgumentList '-show' -Wait -WindowStyle Hidden   # refresh Explorer's icon cache (per-user)
 
 # --------------------------------------------------------------------- 6. Yggdrasil Sky
 if (-not $NoSky) {
