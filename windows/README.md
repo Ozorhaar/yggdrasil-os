@@ -36,6 +36,6 @@ Sky's settings: `%LOCALAPPDATA%\Yggdrasil\Sky\settings.json` (location, `Fps`, `
 
 - Assets (Mac mini): `windows/tools/build.sh` — needs python3 + numpy + scipy + Pillow, rsvg-convert, ffmpeg. Commit the output.
 - App + package: the `windows` GitHub workflow (actions pinned to commit SHAs, locked NuGet restore, build provenance attestation), or locally on Windows with the .NET 10 SDK: `pwsh windows/tools/package.ps1`.
-- After changing NuGet references, run `dotnet restore windows/sky` once and commit `packages.lock.json`; CI restores in locked mode.
+- The .NET SDK is pinned in `windows/sky/global.json` (10.0.403, installed per-user in `~/.dotnet` on the Mac mini). After changing NuGet references or the SDK, run `~/.dotnet/dotnet restore windows/sky` there and commit `packages.lock.json`; CI restores in locked mode.
 
 Preview the scene in any browser: serve `windows/sky/web/` and open `index.html?at=22:30&aurora=1`, `?at=12:00&code=63` (rain), `?code=95` (storm), `?code=73` (snow), `?code=45` (fog), or `?demo=1`.
