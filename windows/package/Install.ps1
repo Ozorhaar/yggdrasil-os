@@ -42,7 +42,7 @@ function Ensure-Key($path) { if (-not (Test-Path -LiteralPath $path)) { New-Item
 # --------------------------------------------------------------------- 0. refuse admin
 $me = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
 if ($me.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    throw "Run this as yourself, not as Administrator: everything installs per-user."
+    throw "This window is running as Administrator. Open a normal Terminal (not 'Run as administrator') and run Install.ps1 again: everything installs for your account only."
 }
 if ([Environment]::OSVersion.Version.Build -lt 22000) { throw "Yggdrasil for Windows needs Windows 11." }
 
@@ -70,7 +70,11 @@ Say "All $($listed.Count) files match" 'DarkGreen'
 
 # --------------------------------------------------------------------- paths
 $Root     = Join-Path $env:LOCALAPPDATA 'Yggdrasil'
-$Theme    = Join-Path $Root 'Theme'
+# Each build installs into its own folder (named from its SHA256SUMS), because Windows keeps
+# sounds, cursors and wallpapers open while they're in use and they can't be overwritten.
+$ThemeRoot = Join-Path $Root 'Theme'
+$Build     = (Get-FileHash -LiteralPath (Join-Path $Src 'SHA256SUMS') -Algorithm SHA256).Hash.Substring(0, 12).ToLowerInvariant()
+$Theme     = Join-Path $ThemeRoot $Build
 $Backup   = Join-Path $Root 'Backup'
 $SkyDir   = Join-Path $env:LOCALAPPDATA 'Programs\YggdrasilSky'
 $Sounds   = Join-Path $Theme 'Sounds'
@@ -80,8 +84,10 @@ New-Item -ItemType Directory -Force -Path $Root, $Backup | Out-Null
 # If anything below fails after Sky was stopped, start it again rather than leaving the desktop static.
 $SkyExe = Join-Path $SkyDir 'YggdrasilSky.exe'
 trap {
-    if (-not $NoSky -and (Test-Path -LiteralPath $SkyExe) -and -not (Get-Process YggdrasilSky -ErrorAction SilentlyContinue)) {
-        Start-Process -FilePath $SkyExe
+    # (Get-Variable: this also catches errors raised before $SkyExe exists, e.g. the admin check)
+    $exe = Get-Variable -Name SkyExe -ValueOnly -ErrorAction SilentlyContinue
+    if (-not $NoSky -and $exe -and (Test-Path -LiteralPath $exe) -and -not (Get-Process YggdrasilSky -ErrorAction SilentlyContinue)) {
+        Start-Process -FilePath $exe
     }
     break
 }
@@ -117,8 +123,13 @@ Set-Content -LiteralPath (Join-Path $Backup 'done') -Value (Get-Date -Format o)
 Say "Copying the theme"
 Stop-Process -Name YggdrasilSky -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 500
-New-Item -ItemType Directory -Force -Path $Theme | Out-Null
-Copy-Item -Path (Join-Path $Src 'theme\*') -Destination $Theme -Recurse -Force
+$done = Join-Path $Theme '.installed'
+if (-not (Test-Path -LiteralPath $done)) {
+    New-Item -ItemType Directory -Force -Path $Theme | Out-Null
+    Copy-Item -Path (Join-Path $Src 'theme\*') -Destination $Theme -Recurse -Force
+    Set-Content -LiteralPath $done -Value (Get-Date -Format o)
+}
+Set-Content -LiteralPath (Join-Path $ThemeRoot 'current.txt') -Value $Theme -Encoding UTF8   # Sky and Uninstall.ps1 read this
 if (-not $NoSky) {
     New-Item -ItemType Directory -Force -Path $SkyDir | Out-Null
     Copy-Item -Path (Join-Path $Src 'sky\*') -Destination $SkyDir -Recurse -Force
@@ -229,9 +240,14 @@ if (-not $NoTerminal) {
     Say "Adding the Yggdrasil Windows Terminal profile"
     $frag = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\Fragments\Yggdrasil'
     New-Item -ItemType Directory -Force -Path $frag | Out-Null
+    # Same shell flavour as Yggdrasil OS (profile.d/zz-yggdrasil.sh): the rune prompt
+    #   ᚤ jason@allfather ~\path ᚱ
+    # and the world tree (fastfetch) once per sign-in, in the first Yggdrasil tab.
     $banner = @'
-function prompt { Write-Host 'ᚨ ' -NoNewline -ForegroundColor DarkYellow; Write-Host $PWD -NoNewline -ForegroundColor Cyan; ' › ' }
-if (Get-Command fastfetch -ErrorAction SilentlyContinue) { fastfetch -c '__FF__' } else { Write-Host ''; Write-Host '   ᚨ ᛚ ᛚ ᚠ ᚨ ᚦ ᛖ ᚱ' -ForegroundColor Yellow; Write-Host '' }
+function global:prompt { $e = [char]27; $p = $PWD.Path; if ($p.StartsWith($HOME, [StringComparison]::OrdinalIgnoreCase)) { $p = '~' + $p.Substring($HOME.Length) }; "$e[38;2;200;162;90mᚤ $e[38;2;232;220;196m$($env:USERNAME.ToLower())$e[38;2;143;196;224m@$($env:COMPUTERNAME.ToLower()) $e[38;2;200;162;90m$p $e[38;2;224;112;58mᚱ$e[0m " }
+function global:yggdrasil { fastfetch -c '__FF__' }
+$m = Join-Path $env:TEMP 'yggdrasil-greeted'; $s = "$((Get-Process explorer -ErrorAction SilentlyContinue | Sort-Object StartTime | Select-Object -First 1).StartTime.Ticks)"
+if ((Get-Content $m -ErrorAction SilentlyContinue) -ne $s) { Set-Content $m $s; if (Get-Command fastfetch -ErrorAction SilentlyContinue) { yggdrasil } else { Write-Host ''; Write-Host '   ᚤ ᚷ ᚷ ᛞ ᚱ ᚨ ᛌ ᛁ ᛚ' -ForegroundColor Yellow; Write-Host '' } }
 '@ -replace "`r?`n", '; '
     $banner = $banner.Replace('__FF__', $ffConfig)
     $json = [ordered]@{
@@ -243,9 +259,12 @@ if (Get-Command fastfetch -ErrorAction SilentlyContinue) { fastfetch -c '__FF__'
             colorScheme                = 'Yggdrasil'
             cursorColor                = '#C8A25A'
             tabColor                   = '#0B1220'
-            backgroundImage            = (Join-Path $Theme 'Wallpapers\Yggdrasil - WorldTree.jpg')
-            backgroundImageOpacity     = 0.10
-            backgroundImageStretchMode = 'uniformToFill'
+            # Konsole profile: 94% opacity with blur, I-beam cursor, 8 px margin, long history
+            opacity                    = 94
+            useAcrylic                 = $true
+            cursorShape                = 'bar'
+            padding                    = '8'
+            historySize                = 32767
             font                       = @{ face = 'Cascadia Mono' }
         })
         schemes = @([ordered]@{
@@ -379,6 +398,18 @@ Set-ItemProperty $p -Name ColorPrevalence -Value 0 -Type DWord
 Set-ItemProperty 'HKCU:\Software\Microsoft\Windows\DWM' -Name ColorPrevalence -Value 0 -Type DWord
 
 Start-Process -FilePath $themeFile      # Windows applies it and opens Settings > Themes
+Start-Sleep -Seconds 3
+
+# Pointers: set them the way the Mouse control panel does. A .theme file sets the files but
+# leaves "Scheme Source" on the Windows default, so Windows later reloads its own pointers.
+if (-not $NoCursors) {
+    $c = 'HKCU:\Control Panel\Cursors'
+    foreach ($r in $roles) { Set-ItemProperty $c -Name $r -Value $cursorPath[$r] }
+    Set-ItemProperty $c -Name '(default)' -Value 'Yggdrasil'
+    Set-ItemProperty $c -Name 'Scheme Source' -Value 1 -Type DWord        # 1 = a user scheme
+    Add-Type -Namespace Ygg -Name Spi -MemberDefinition '[DllImport("user32.dll")] public static extern bool SystemParametersInfo(uint a, uint b, System.IntPtr c, uint d);'
+    [void][Ygg.Spi]::SystemParametersInfo(0x57, 0, [IntPtr]::Zero, 3)  # SPI_SETCURSORS, save + broadcast
+}
 Start-Sleep -Seconds 2
 Start-Process ie4uinit.exe -ArgumentList '-show' -Wait -WindowStyle Hidden   # refresh Explorer's icon cache (per-user)
 
@@ -390,6 +421,10 @@ if (-not $NoSky) {
     Start-Process -FilePath $exe
     Say "Yggdrasil Sky is running (tray icon: demo, pause, quit). Windows SmartScreen may ask once: it's unsigned."
 }
+
+# Tidy up earlier builds; anything Windows still has open goes next time.
+Get-ChildItem -LiteralPath $ThemeRoot -Force | Where-Object { $_.Name -ne $Build -and $_.Name -ne 'current.txt' } |
+    ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
 
 Write-Host ''
 Say "Done. Skål!" 'DarkGreen'

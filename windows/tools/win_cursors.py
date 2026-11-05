@@ -19,6 +19,7 @@ from PIL import Image
 
 GOLD, GOLD_HI, FROST, NIGHT, BONE, EMBER, CARVE = "#c8a25a", "#ecd08f", "#8fc4e0", "#0b1220", "#e8dcc4", "#e0703a", "#5a4420"
 SIZES = (32, 48, 64, 96, 128)
+ANI_SIZES = (32, 48, 64, 128)   # what Windows' .ani loader accepted on allfather (no 96)
 FRAMES = 24          # busy ring: 15 degrees a frame
 RATE = 3             # jiffies (1/60 s) per frame -> 20 fps
 
@@ -168,10 +169,10 @@ def ani(frames, rate):
     def chunk(tag, data):
         pad = b"\0" if len(data) % 2 else b""
         return tag + struct.pack("<I", len(data)) + data + pad
+    # Plain layout, no INFO list: Windows rejected the earlier version as corrupt.
     anih = struct.pack("<9I", 36, len(frames), len(frames), 0, 0, 0, 0, rate, 1)  # AF_ICON
-    info = chunk(b"LIST", b"INFO" + chunk(b"INAM", b"Yggdrasil\0") + chunk(b"IART", b"Yggdrasil Systems\0"))
     fram = chunk(b"LIST", b"fram" + b"".join(chunk(b"icon", f) for f in frames))
-    body = b"ACON" + info + chunk(b"anih", anih) + fram
+    body = b"ACON" + chunk(b"anih", anih) + fram
     return b"RIFF" + struct.pack("<I", len(body)) + body
 
 
@@ -180,7 +181,8 @@ def main():
     os.makedirs(out, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
         for role, (frames, hot) in cursors().items():
-            curs = [cur([(s, render(f, s, tmp)) for s in SIZES], hot) for f in frames]
+            sizes = SIZES if len(frames) == 1 else ANI_SIZES
+            curs = [cur([(s, render(f, s, tmp)) for s in sizes], hot) for f in frames]
             if len(curs) == 1:
                 name, data = f"Yggdrasil {role}.cur", curs[0]
             else:
