@@ -30,6 +30,11 @@ from sounds import SR, env, horn, reverb  # noqa: E402
 
 RNG = np.random.default_rng(7)
 
+# The .ogg files need ffmpeg's libvorbis encoder. Homebrew's plain ffmpeg doesn't have it on
+# the Mac mini, so prefer the keg-only ffmpeg-full there; $FFMPEG overrides both.
+FFMPEG = os.environ.get("FFMPEG") or next(
+    (p for p in ("/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg",) if os.path.exists(p)), "ffmpeg")
+
 
 def lp(x, hz, order=4):
     return sosfilt(butter(order, hz, "low", fs=SR, output="sos"), x)
@@ -299,7 +304,7 @@ def write_ogg(path, x, peak):
         w.setframerate(SR)
         w.writeframes(st.tobytes())
     title = os.path.splitext(os.path.basename(path))[0]
-    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", tmp, "-c:a", "libvorbis", "-q:a", "6",
+    subprocess.run([FFMPEG, "-loglevel", "error", "-y", "-i", tmp, "-c:a", "libvorbis", "-q:a", "6",
                     "-metadata", f"title={title}", "-metadata", "artist=Yggdrasil", path], check=True)
     os.unlink(tmp)
     print(f"{path}: {len(x) / SR:.1f}s")
@@ -313,7 +318,7 @@ def main():
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
         tmp = f.name
     chiptune.render(tmp, plan=[(112, 216, 2)], ending=False)
-    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", tmp, "-c:a", "libvorbis", "-q:a", "6",
+    subprocess.run([FFMPEG, "-loglevel", "error", "-y", "-i", tmp, "-c:a", "libvorbis", "-q:a", "6",
                     "-metadata", "title=Yggdrasil - Mountain King", "-metadata", "artist=Yggdrasil",
                     os.path.join(out, "Ringtones", "Yggdrasil - Mountain King.ogg")], check=True)
     os.unlink(tmp)
