@@ -70,7 +70,11 @@ Say "All $($listed.Count) files match" 'DarkGreen'
 
 # --------------------------------------------------------------------- paths
 $Root     = Join-Path $env:LOCALAPPDATA 'Yggdrasil'
-$Theme    = Join-Path $Root 'Theme'
+# Each build installs into its own folder (named from its SHA256SUMS), because Windows keeps
+# sounds, cursors and wallpapers open while they're in use and they can't be overwritten.
+$ThemeRoot = Join-Path $Root 'Theme'
+$Build     = (Get-FileHash -LiteralPath (Join-Path $Src 'SHA256SUMS') -Algorithm SHA256).Hash.Substring(0, 12).ToLowerInvariant()
+$Theme     = Join-Path $ThemeRoot $Build
 $Backup   = Join-Path $Root 'Backup'
 $SkyDir   = Join-Path $env:LOCALAPPDATA 'Programs\YggdrasilSky'
 $Sounds   = Join-Path $Theme 'Sounds'
@@ -119,8 +123,13 @@ Set-Content -LiteralPath (Join-Path $Backup 'done') -Value (Get-Date -Format o)
 Say "Copying the theme"
 Stop-Process -Name YggdrasilSky -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 500
-New-Item -ItemType Directory -Force -Path $Theme | Out-Null
-Copy-Item -Path (Join-Path $Src 'theme\*') -Destination $Theme -Recurse -Force
+$done = Join-Path $Theme '.installed'
+if (-not (Test-Path -LiteralPath $done)) {
+    New-Item -ItemType Directory -Force -Path $Theme | Out-Null
+    Copy-Item -Path (Join-Path $Src 'theme\*') -Destination $Theme -Recurse -Force
+    Set-Content -LiteralPath $done -Value (Get-Date -Format o)
+}
+Set-Content -LiteralPath (Join-Path $ThemeRoot 'current.txt') -Value $Theme -Encoding UTF8   # Sky and Uninstall.ps1 read this
 if (-not $NoSky) {
     New-Item -ItemType Directory -Force -Path $SkyDir | Out-Null
     Copy-Item -Path (Join-Path $Src 'sky\*') -Destination $SkyDir -Recurse -Force
@@ -392,6 +401,10 @@ if (-not $NoSky) {
     Start-Process -FilePath $exe
     Say "Yggdrasil Sky is running (tray icon: demo, pause, quit). Windows SmartScreen may ask once: it's unsigned."
 }
+
+# Tidy up earlier builds; anything Windows still has open goes next time.
+Get-ChildItem -LiteralPath $ThemeRoot -Force | Where-Object { $_.Name -ne $Build -and $_.Name -ne 'current.txt' } |
+    ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
 
 Write-Host ''
 Say "Done. Skål!" 'DarkGreen'

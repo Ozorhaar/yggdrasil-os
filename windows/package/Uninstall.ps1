@@ -27,7 +27,9 @@ Get-ChildItem "$base\Apps" -Recurse -ErrorAction SilentlyContinue |
 Remove-Item "$base\Names\Yggdrasil" -Recurse -Force -ErrorAction SilentlyContinue
 
 Say "Taking the shields off your folders and desktop icons"
-$helper = Join-Path $Root 'Theme\Set-FolderIcon.ps1'
+$current = Join-Path $Root 'Theme\current.txt'
+$themeDir = if (Test-Path -LiteralPath $current) { (Get-Content -LiteralPath $current -Raw).Trim() } else { Join-Path $Root 'Theme' }
+$helper = Join-Path $themeDir 'Set-FolderIcon.ps1'
 if (Test-Path -LiteralPath $helper) {
     . $helper
     try { Reset-YggdrasilFolderIcon -All -Backup $Backup } catch { Say "Folder icons: $($_.Exception.Message)" 'Yellow' }
