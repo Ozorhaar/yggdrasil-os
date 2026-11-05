@@ -42,7 +42,7 @@ function Ensure-Key($path) { if (-not (Test-Path -LiteralPath $path)) { New-Item
 # --------------------------------------------------------------------- 0. refuse admin
 $me = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
 if ($me.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    throw "Run this as yourself, not as Administrator: everything installs per-user."
+    throw "This window is running as Administrator. Open a normal Terminal (not 'Run as administrator') and run Install.ps1 again: everything installs for your account only."
 }
 if ([Environment]::OSVersion.Version.Build -lt 22000) { throw "Yggdrasil for Windows needs Windows 11." }
 
@@ -80,8 +80,10 @@ New-Item -ItemType Directory -Force -Path $Root, $Backup | Out-Null
 # If anything below fails after Sky was stopped, start it again rather than leaving the desktop static.
 $SkyExe = Join-Path $SkyDir 'YggdrasilSky.exe'
 trap {
-    if (-not $NoSky -and (Test-Path -LiteralPath $SkyExe) -and -not (Get-Process YggdrasilSky -ErrorAction SilentlyContinue)) {
-        Start-Process -FilePath $SkyExe
+    # (Get-Variable: this also catches errors raised before $SkyExe exists, e.g. the admin check)
+    $exe = Get-Variable -Name SkyExe -ValueOnly -ErrorAction SilentlyContinue
+    if (-not $NoSky -and $exe -and (Test-Path -LiteralPath $exe) -and -not (Get-Process YggdrasilSky -ErrorAction SilentlyContinue)) {
+        Start-Process -FilePath $exe
     }
     break
 }
