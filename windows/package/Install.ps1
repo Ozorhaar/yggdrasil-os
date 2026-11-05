@@ -240,9 +240,14 @@ if (-not $NoTerminal) {
     Say "Adding the Yggdrasil Windows Terminal profile"
     $frag = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\Fragments\Yggdrasil'
     New-Item -ItemType Directory -Force -Path $frag | Out-Null
+    # Same shell flavour as Yggdrasil OS (profile.d/zz-yggdrasil.sh): the rune prompt
+    #   ᚤ jason@allfather ~\path ᚱ
+    # and the world tree (fastfetch) once per sign-in, in the first Yggdrasil tab.
     $banner = @'
-function prompt { Write-Host 'ᚨ ' -NoNewline -ForegroundColor DarkYellow; Write-Host $PWD -NoNewline -ForegroundColor Cyan; ' › ' }
-if (Get-Command fastfetch -ErrorAction SilentlyContinue) { fastfetch -c '__FF__' } else { Write-Host ''; Write-Host '   ᚨ ᛚ ᛚ ᚠ ᚨ ᚦ ᛖ ᚱ' -ForegroundColor Yellow; Write-Host '' }
+function global:prompt { $e = [char]27; $p = $PWD.Path; if ($p.StartsWith($HOME, [StringComparison]::OrdinalIgnoreCase)) { $p = '~' + $p.Substring($HOME.Length) }; "$e[38;2;200;162;90mᚤ $e[38;2;232;220;196m$($env:USERNAME.ToLower())$e[38;2;143;196;224m@$($env:COMPUTERNAME.ToLower()) $e[38;2;200;162;90m$p $e[38;2;224;112;58mᚱ$e[0m " }
+function global:yggdrasil { fastfetch -c '__FF__' }
+$m = Join-Path $env:TEMP 'yggdrasil-greeted'; $s = "$((Get-Process explorer -ErrorAction SilentlyContinue | Sort-Object StartTime | Select-Object -First 1).StartTime.Ticks)"
+if ((Get-Content $m -ErrorAction SilentlyContinue) -ne $s) { Set-Content $m $s; if (Get-Command fastfetch -ErrorAction SilentlyContinue) { yggdrasil } else { Write-Host ''; Write-Host '   ᚤ ᚷ ᚷ ᛞ ᚱ ᚨ ᛌ ᛁ ᛚ' -ForegroundColor Yellow; Write-Host '' } }
 '@ -replace "`r?`n", '; '
     $banner = $banner.Replace('__FF__', $ffConfig)
     $json = [ordered]@{
@@ -254,9 +259,12 @@ if (Get-Command fastfetch -ErrorAction SilentlyContinue) { fastfetch -c '__FF__'
             colorScheme                = 'Yggdrasil'
             cursorColor                = '#C8A25A'
             tabColor                   = '#0B1220'
-            backgroundImage            = (Join-Path $Theme 'Wallpapers\Yggdrasil - WorldTree.jpg')
-            backgroundImageOpacity     = 0.10
-            backgroundImageStretchMode = 'uniformToFill'
+            # Konsole profile: 94% opacity with blur, I-beam cursor, 8 px margin, long history
+            opacity                    = 94
+            useAcrylic                 = $true
+            cursorShape                = 'bar'
+            padding                    = '8'
+            historySize                = 32767
             font                       = @{ face = 'Cascadia Mono' }
         })
         schemes = @([ordered]@{
