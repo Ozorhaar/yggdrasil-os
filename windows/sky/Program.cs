@@ -10,6 +10,6 @@ internal static class Program
         Directory.CreateDirectory(Settings.Dir);
         ApplicationConfiguration.Initialize();
         Application.ThreadException += (_, e) => Log.Write("error: " + e.Exception);
-        Application.Run(new SkyForm(args.Contains("--startup")));
+        Application.Run(new SkyApp(args.Contains("--startup")));
     }
 }
