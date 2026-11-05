@@ -1,0 +1,36 @@
+{
+    "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+    "logo": {
+        "type": "file",
+        "source": "__LOGO__",
+        "color": {
+            "1": "38;2;200;162;90",
+            "2": "38;2;140;98;58",
+            "3": "38;2;224;112;58"
+        },
+        "padding": { "right": 3 }
+    },
+    "display": {
+        "separator": "  ",
+        "color": { "keys": "38;2;200;162;90" }
+    },
+    "modules": [
+        { "type": "title", "color": { "user": "38;2;232;220;196", "at": "38;2;143;196;224", "host": "38;2;224;112;58" } },
+        { "type": "custom", "format": "\u001b[38;2;143;196;224m~ the world tree stands ~" },
+        "break",
+        { "type": "os",       "key": "Realm    " },
+        { "type": "kernel",   "key": "Root     " },
+        { "type": "uptime",   "key": "Voyage   " },
+        { "type": "packages", "key": "Hoard    " },
+        { "type": "shell",    "key": "Runes    " },
+        { "type": "wm",       "key": "Hall     " },
+        { "type": "terminal", "key": "Tongue   " },
+        { "type": "cpu",      "key": "Forge    " },
+        { "type": "gpu",      "key": "Fire     " },
+        { "type": "memory",   "key": "Mind     " },
+        { "type": "disk",     "key": "Longhouse", "folders": "C:\\" },
+        { "type": "localip",  "key": "Bifröst  " },
+        "break",
+        "colors"
+    ]
+}

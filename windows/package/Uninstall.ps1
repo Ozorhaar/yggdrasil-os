@@ -59,6 +59,17 @@ Add-Type -Namespace Ygg -Name Spi -MemberDefinition '[DllImport("user32.dll")] p
 [void][Ygg.Spi]::SystemParametersInfo(0x57, 0, [IntPtr]::Zero, 3)     # SPI_SETCURSORS
 Start-Process ie4uinit.exe -ArgumentList '-show' -Wait -WindowStyle Hidden
 
+$rm = @("$env:ProgramFiles\Rainmeter\Rainmeter.exe", "${env:ProgramFiles(x86)}\Rainmeter\Rainmeter.exe") |
+      Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
+if ($rm) {
+    Say "Removing the Rainmeter clock and meters"
+    if (Get-Process Rainmeter -ErrorAction SilentlyContinue) {
+        Start-Process $rm -Wait -ArgumentList '[!DeactivateConfig "Yggdrasil\Clock"][!DeactivateConfig "Yggdrasil\Meters"]'
+        Start-Sleep -Seconds 1
+    }
+    Remove-Item (Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'Rainmeter\Skins\Yggdrasil') -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 Say "Removing the font and the Terminal profile"
 Remove-ItemProperty 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts' -Name 'Yggdrasil Runic (TrueType)' -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\Fonts\YggdrasilRunic.ttf') -Force -ErrorAction SilentlyContinue
@@ -70,4 +81,5 @@ Remove-Item $SkyDir -Recurse -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 3
 Remove-Item $Root -Recurse -Force -ErrorAction SilentlyContinue
 
+Say "fastfetch and Rainmeter stay installed; remove them with winget uninstall if you like." 'DarkYellow'
 Say "Done. The lock screen keeps the Fjord until you pick another in Settings > Personalization > Lock screen." 'DarkGreen'

@@ -25,9 +25,11 @@
 .PARAMETER NoTerminal   Skip the Windows Terminal profile.
 .PARAMETER NoCursors    Keep your current mouse pointers.
 .PARAMETER NoFolderIcons Leave Documents, Downloads, Pictures, Music and Videos with their usual icons.
+.PARAMETER NoFastfetch  Don't install fastfetch (winget, your account only) for the Terminal banner.
+.PARAMETER NoWidgets    Skip the Rainmeter clock and meters.
 #>
 [CmdletBinding()]
-param([switch]$NoSky, [switch]$NoSounds, [switch]$NoLockScreen, [switch]$NoTerminal, [switch]$NoCursors, [switch]$NoFolderIcons)
+param([switch]$NoSky, [switch]$NoSounds, [switch]$NoLockScreen, [switch]$NoTerminal, [switch]$NoCursors, [switch]$NoFolderIcons, [switch]$NoFastfetch, [switch]$NoWidgets)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -207,6 +209,21 @@ if (-not $NoLockScreen) {
     }
 }
 
+# --------------------------------------------------------------------- 4c2. fastfetch
+$ffConfig = Join-Path $Theme 'Fastfetch\yggdrasil.jsonc'
+$tmpl = Get-Content -LiteralPath (Join-Path $Theme 'Fastfetch\config.jsonc') -Raw
+$logo = (Join-Path $Theme 'Fastfetch\logo.txt').Replace('\', '\\')
+[IO.File]::WriteAllText($ffConfig, $tmpl.Replace('__LOGO__', $logo), (New-Object Text.UTF8Encoding $false))
+if (-not $NoFastfetch -and -not $NoTerminal -and -not (Get-Command fastfetch -ErrorAction SilentlyContinue)) {
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        Say "Installing fastfetch with winget (your account only, no admin)"
+        Start-Process winget -Wait -NoNewWindow -ArgumentList 'install', '--id', 'Fastfetch-cli.Fastfetch', '--exact',
+            '--source', 'winget', '--scope', 'user', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity'
+    } else {
+        Say "winget isn't available, so the Terminal shows the rune banner instead of fastfetch" 'Yellow'
+    }
+}
+
 # --------------------------------------------------------------------- 4d. Windows Terminal fragment
 if (-not $NoTerminal) {
     Say "Adding the Yggdrasil Windows Terminal profile"
@@ -214,8 +231,9 @@ if (-not $NoTerminal) {
     New-Item -ItemType Directory -Force -Path $frag | Out-Null
     $banner = @'
 function prompt { Write-Host 'ᚨ ' -NoNewline -ForegroundColor DarkYellow; Write-Host $PWD -NoNewline -ForegroundColor Cyan; ' › ' }
-Write-Host ''; Write-Host '   ᚨ ᛚ ᛚ ᚠ ᚨ ᚦ ᛖ ᚱ' -ForegroundColor Yellow; Write-Host ''
+if (Get-Command fastfetch -ErrorAction SilentlyContinue) { fastfetch -c '__FF__' } else { Write-Host ''; Write-Host '   ᚨ ᛚ ᛚ ᚠ ᚨ ᚦ ᛖ ᚱ' -ForegroundColor Yellow; Write-Host '' }
 '@ -replace "`r?`n", '; '
+    $banner = $banner.Replace('__FF__', $ffConfig)
     $json = [ordered]@{
         profiles = @([ordered]@{
             guid                       = '{6b1f3d2a-6f8e-4b0a-9c51-79a0e0c8a25a}'
@@ -274,6 +292,34 @@ if (-not $NoFolderIcons) {
         if ($f.Value -and (Test-Path -LiteralPath $f.Value)) {
             try { Set-YggdrasilFolderIcon -Path $f.Value -Icon $f.Key -Backup $Backup }
             catch { Say "Couldn't set the icon on $($f.Value): $($_.Exception.Message)" 'Yellow' }
+        }
+    }
+}
+
+# --------------------------------------------------------------------- 4g. Rainmeter clock + meters
+if (-not $NoWidgets) {
+    $rm = @("$env:ProgramFiles\Rainmeter\Rainmeter.exe", "${env:ProgramFiles(x86)}\Rainmeter\Rainmeter.exe") |
+          Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
+    if (-not $rm) {
+        Say "Rainmeter isn't installed. For the clock and meters run:  winget install Rainmeter.Rainmeter  (it asks for admin), then Install.ps1 again" 'Yellow'
+    } else {
+        Say "Adding the Yggdrasil clock and meters to Rainmeter"
+        $skins = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'Rainmeter\Skins'
+        $rmIni = Join-Path $env:APPDATA 'Rainmeter\Rainmeter.ini'
+        if (Test-Path -LiteralPath $rmIni) {
+            $line = Select-String -LiteralPath $rmIni -Pattern '^\s*SkinPath\s*=\s*(.+)$' | Select-Object -First 1
+            if ($line) { $skins = $line.Matches[0].Groups[1].Value.Trim() }
+        }
+        New-Item -ItemType Directory -Force -Path $skins | Out-Null
+        Copy-Item -Path (Join-Path $Theme 'Rainmeter\Yggdrasil') -Destination $skins -Recurse -Force
+        if (-not (Get-Process Rainmeter -ErrorAction SilentlyContinue)) { Start-Process $rm; Start-Sleep -Seconds 4 }
+        Add-Type -AssemblyName System.Windows.Forms
+        $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+        $x = $wa.Right - 560 - 48; $y = $wa.Top + 48
+        Start-Process $rm -ArgumentList '!RefreshApp' -Wait; Start-Sleep -Seconds 2
+        foreach ($w in @(@('Clock', $y), @('Meters', $y + 232 + 16))) {
+            $cfg = "Yggdrasil\$($w[0])"
+            Start-Process $rm -Wait -ArgumentList "[!ActivateConfig `"$cfg`" `"$($w[0]).ini`"][!Move `"$x`" `"$($w[1])`" `"$cfg`"][!ZPos `"-2`" `"$cfg`"]"
         }
     }
 }

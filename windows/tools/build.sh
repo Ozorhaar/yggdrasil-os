@@ -44,6 +44,12 @@ rm -rf "$T/Cursors" "$T/Icons"
 python3 windows/tools/win_cursors.py "$T/Cursors"
 python3 windows/tools/win_icons.py "$T/Icons"
 
+# ---- Rainmeter frames + fastfetch (same logo and layout as Yggdrasil OS)
+python3 windows/tools/win_widgets.py "$T/Rainmeter/Yggdrasil/@Resources"
+mkdir -p "$T/Rainmeter/Yggdrasil/@Resources/Fonts"
+cp files/system/usr/share/fonts/yggdrasil/YggdrasilRunic.ttf "$T/Rainmeter/Yggdrasil/@Resources/Fonts/"
+cp files/system/usr/share/yggdrasil/logo.txt "$T/Fastfetch/logo.txt"
+
 # ---- font (shared with Yggdrasil OS)
 mkdir -p "$T/Fonts"
 cp files/system/usr/share/fonts/yggdrasil/YggdrasilRunic.ttf "$T/Fonts/"
