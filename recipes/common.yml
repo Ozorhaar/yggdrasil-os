@@ -18,4 +18,14 @@ modules:
     scripts:
       - yggdrasil-build.sh
 
+  # Apps installed on the booted system (system-wide, from Flathub). Checked at
+  # every boot and skipped when nothing changed; remove an app here and it stays
+  # installed until you uninstall it yourself.
+  - type: default-flatpaks
+    configurations:
+      - notify: false
+        scope: system
+        install:
+          - org.jellyfin.JellyfinDesktop   # official Jellyfin client (the old Jellyfin Media Player)
+
   - type: signing
