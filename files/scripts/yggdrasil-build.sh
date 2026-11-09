@@ -8,6 +8,9 @@ chmod 0755 /usr/libexec/yggdrasil-greeter-theme
 systemctl enable yggdrasil-greeter-theme.service
 chmod 0755 /usr/libexec/yggdrasil-grub-theme /usr/libexec/yggdrasil-login-sound
 systemctl enable yggdrasil-grub-theme.service
+# Plasma plays the sound theme's desktop-login itself; Yggdrasil plays it (and lets you pick
+# chiptune / horn / off) from its own autostart, so Plasma's copy would double it
+systemctl --global mask plasma-startupsound.service
 
 # ---------------------------------------------------------------- branding
 # Only the display name changes; ID/VARIANT stay Bazzite's so its update and

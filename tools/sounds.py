@@ -84,16 +84,16 @@ def main():
     # login: the opening of Grieg's "In the Hall of the Mountain King" (1875,
     # public domain) as an 8-bit chiptune -- once sneaky, once flat out, then
     # three stabs. Eleven seconds of square waves sounds far louder than it measures,
-    # so it sits a few dB under the short dialog sounds (about -27 dBFS average).
+    # so it sits a few dB under the short dialog sounds (about -28 dBFS average).
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import chiptune
     chiptune.render(f"{out}/desktop-login.wav", plan=[(160, 195, 1), (210, 250, 4)],
-                    sections=[chiptune.SECTION_A], peak=0.19)
+                    sections=[chiptune.SECTION_A], peak=0.17)
     # the old login: a long rising war-horn call, then a second, higher blast
     # (switch back with:  yggdrasil-theme login-sound horn)
     call = np.concatenate([horn([98, 110, 110, 110], 1.8), np.zeros(int(0.15 * SR)),
                            horn([110, 147, 147, 146], 1.6)])
-    write(f"{out}/desktop-login-horn.wav", reverb(call, 0.5), 0.15)
+    write(f"{out}/desktop-login-horn.wav", reverb(call, 0.5), 0.135)
     write(f"{out}/desktop-logout.wav", reverb(horn([147, 130, 110, 98], 1.6), 0.5), 0.6)
     write(f"{out}/service-login.wav", reverb(horn([110, 147, 147], 1.0), 0.4), 0.6)
     write(f"{out}/complete.wav", reverb(horn([147, 147, 196, 196], 0.7), 0.3), 0.5)
