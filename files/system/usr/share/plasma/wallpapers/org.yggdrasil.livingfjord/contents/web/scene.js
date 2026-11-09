@@ -28,6 +28,7 @@ try { snowAt = +(localStorage.getItem("snowAt") || 0); } catch (e) { }
 let land = null, ship = null;
 let landTint = null, shipTint = null, tintKey = "";
 let fg = null, refl = null;           // cached: tinted land+ship, and the mountains' reflection
+let shipRefl = null;                  // cached: the longship mirrored about its own waterline
 let ray = null, puff = null;
 let timer = 0, lastT = 0, flashAt = 0, nextFlash = 0;
 let W = 0, H = 0;
@@ -313,6 +314,7 @@ function draw(uptime) {
   if (key !== tintKey && land && ship) {
     landTint = tinted(land, landTint, l * (1 + 0.15 * p.glow), l, l * (1 - 0.1 * p.glow));
     shipTint = tinted(ship, shipTint, sl, sl, sl);
+    shipRefl = mirrorShip(shipTint, shipRefl);
     fg = landTint;      // the longship is drawn on its own now: it can sail off
     refl = refl || document.createElement("canvas"); refl.width = ART_W; refl.height = ART_H;
     const r = refl.getContext("2d"); r.clearRect(0, 0, ART_W, ART_H);
@@ -376,8 +378,11 @@ function draw(uptime) {
       g.addColorStop(0, rgba(hex(0xECD08F), 0.32 * sun * fade)); g.addColorStop(1, rgba(hex(0xECD08F), 0));
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, rr, 0, 6.283); ctx.fill();
     }
-    if (rowing) drawOars(t, fade, p.dark);
+    if (shipRefl) {   // its reflection, below its own waterline
+      ctx.globalAlpha = 0.30 * fade; ctx.drawImage(shipRefl, SHIP_BOX[0], SHIP.wl); ctx.globalAlpha = 1;
+    }
     ctx.globalAlpha = fade; ctx.drawImage(shipTint, 0, 0); ctx.globalAlpha = 1;
+    drawOars(t, fade, p.dark, rowing);   // the near side's oars, in front of the hull
     if (sun > 0.02 && sailMask) {
       ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.45 * sun * fade;
       ctx.drawImage(sailMask, sx0, sy0); ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
@@ -525,8 +530,17 @@ async function start() {
 // The shelf on the left-hand mountains, in the art's coordinates (5120 x 1440).
 const SHELF_Y = 420, SHELF_L0 = 1330, SHELF_L1 = 1388, SHELF_R1 = 1730, SHELF_R0 = 1780;
 const HALL_L = 1420, HALL_R = 1720;
-// The longship layer: the waterline pivot, the sail, the hull's oar line, the masthead.
-const SHIP_PIVOT = [2070, 893], SAIL = [1700, 560, 2240, 840], MAST_TOP = [2040, 530];
+// The longship layer, afloat (win_art.py: art.fjord_layers(afloat=True, live=True)). Ship units are
+// art.py's longship() coordinates: x 200 is midships, y 0 the gunwale, and the hull meets the water
+// at y = SHIP.draft. win_art.py checks these numbers against its own, so keep the line as it is.
+const SHIP = { x: 2048, wl: 892.8, s: 1.993333, draft: 12 };
+const shipPt = (u, v) => [SHIP.x + (u - 200) * SHIP.s, SHIP.wl + (v - SHIP.draft) * SHIP.s];
+const SHIP_PIVOT = shipPt(212, SHIP.draft);                           // centre of the waterline
+const SAIL = [...shipPt(100, -172), ...shipPt(300, -26)];             // sail cloth box
+const MAST_TOP = shipPt(200, -185);
+const SHIP_BOX = [...shipPt(-30, -192), ...shipPt(452, SHIP.draft)];  // everything above the water
+const OAR_PORTS = Array.from({ length: 9 }, (_, i) => shipPt(70 + i * 34, 2));
+const OAR_LEN = 40.2 * SHIP.s, OAR_REST = Math.atan2(36, -18);       // the still art's oar angle
 const SOLAR_FULL_W = 7000;
 const NAME = "Jason";
 
@@ -874,15 +888,41 @@ function perchedRaven(x, y, L, bob, stick) {
 }
 
 /** Oars out of the hull, sweeping aft through the water and lifting back (in art coordinates). */
-function drawOars(t, fade, dark) {
-  ctx.strokeStyle = rgba(mix(hex(0x5A4630), hex(0x1C150F), dark), fade); ctx.lineCap = "round";
-  const phase = t * 0.0026;
-  for (let i = 0; i < 9; i++) {
-    const px = 1720 + i * 80, py = 862;
-    const a = Math.PI / 2 + 0.42 * Math.sin(phase), len = 125 + 18 * Math.cos(phase);
-    const ex = px + Math.cos(a) * len, ey = py + Math.sin(a) * len;
-    ctx.lineWidth = 3.4; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(ex, ey); ctx.stroke();
-    ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(px + Math.cos(a) * len * 0.82, py + Math.sin(a) * len * 0.82); ctx.lineTo(ex, ey); ctx.stroke();
+/** The longship's reflection: the part above the water, flipped about the waterline and softened. */
+function mirrorShip(img, prev) {
+  const [x0, y0, x1, y1] = SHIP_BOX, w = Math.ceil(x1 - x0), h = Math.ceil(y1 - y0);
+  const c = prev || document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d"); g.clearRect(0, 0, w, h);
+  g.filter = "blur(3px)";
+  g.translate(0, h); g.scale(1, -1);
+  g.drawImage(img, x0, y0, w, h, 0, 0, w, h);
+  return c;
+}
+
+/**
+ * The oars on the near side, from the ports below the shields down to the water. Seen from here an
+ * oar reaching toward you meets the water below the hull's own waterline, so only the blade goes
+ * under. While rowing they sweep back with the blade in, then lift and swing forward again;
+ * otherwise they rest with the blades in the water.
+ */
+function drawOars(t, fade, dark, rowing) {
+  const wood = mix(hex(0x6B5032), hex(0x1C150F), dark);
+  const ph = t * 0.0026;
+  const a = rowing ? OAR_REST + 0.34 * Math.sin(ph) : OAR_REST + 0.08;
+  const lift = rowing ? Math.max(0, Math.cos(ph)) : 0;     // 0 = blade in the water, 1 = clear of it
+  const len = OAR_LEN * (1 - 0.16 * lift);
+  ctx.lineCap = "round";
+  for (const [px, py] of OAR_PORTS) {
+    const ca = Math.cos(a), sa = Math.sin(a), ex = px + ca * len, ey = py + sa * len;
+    const bx = px + ca * len * 0.76, by = py + sa * len * 0.76;
+    ctx.strokeStyle = rgba(wood, fade);
+    ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(bx, by); ctx.stroke();
+    ctx.strokeStyle = rgba(wood, fade * (0.5 + 0.5 * lift));      // the blade, dimmer while under
+    ctx.lineWidth = 11; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(ex, ey); ctx.stroke();
+    if (lift < 0.5) {                                              // a ring where it cuts the water
+      ctx.strokeStyle = rgba(hex(0xDDE6F5), 0.22 * fade * (1 - 2 * lift)); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(bx, by, 11, 3, 0, 0, 6.283); ctx.stroke();
+    }
   }
 }
 

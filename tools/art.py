@@ -278,8 +278,12 @@ def aurora(rnd, w, y0, bands=4):
     return s
 
 
-def longship(x, y, s, hull="#06080d", sail_a=EMBER, sail_b=BONE, shields=(GOLD, FROST, OAK)):
-    """An original longship silhouette; (x,y)=waterline centre, s=scale."""
+SHIP_DRAFT = 12   # ship units of hull under the water when afloat (the keel curve reaches 25)
+
+
+def longship(x, y, s, hull="#06080d", sail_a=EMBER, sail_b=BONE, shields=(GOLD, FROST, OAK), oars=True):
+    """An original longship silhouette; (x,y)=waterline centre, s=scale. oars=False leaves the
+    oars off (the living wallpapers row their own)."""
     T = f'transform="translate({x},{y}) scale({s}) translate(-200,0)"'
     hullp = ("M -14,-78 C -10,-40 4,-8 30,4 Q 200,46 372,4 C 398,-6 414,-46 420,-96 "
              "C 422,-112 444,-116 446,-100 C 448,-88 432,-86 434,-98 C 428,-60 412,-18 386,-6 "
@@ -304,10 +308,42 @@ def longship(x, y, s, hull="#06080d", sail_a=EMBER, sail_b=BONE, shields=(GOLD, 
         col = shields[i % len(shields)]
         g += f'<circle cx="{sx}" cy="-8" r="10" fill="{col}" opacity="0.85"/>'
         g += f'<circle cx="{sx}" cy="-8" r="3" fill="{hull}"/>'
-    # oars
-    for ox in range(70, 340, 34):
-        g += f'<line x1="{ox}" y1="4" x2="{ox - 18}" y2="40" stroke="{hull}" stroke-width="3"/>'
+    if oars:
+        g += _oar_lines(hull)
     g += '</g>'
+    return g
+
+
+def _oar_lines(hull):
+    return "".join(f'<line x1="{ox}" y1="4" x2="{ox - 18}" y2="40" stroke="{hull}" stroke-width="3"/>'
+                   for ox in range(70, 340, 34))
+
+
+def longship_oars(x, y, s, hull="#06080d"):
+    """Just the longship's oars, placed like longship(x, y, s)."""
+    return f'<g transform="translate({x},{y}) scale({s}) translate(-200,0)">{_oar_lines(hull)}</g>'
+
+
+def ship_on_water(sx, hz, sc, afloat=False, oars=True, reflect=True, uid="w"):
+    """The longship on the fjord, plus its reflection.
+
+    afloat=False is the original placement (hull top at the horizon, reflected about it).
+    afloat=True sits the hull in the water at the horizon line: SHIP_DRAFT units of it are under
+    water (hidden), and the reflection mirrors about that same waterline."""
+    if not afloat:
+        g = longship(sx, hz + 6, sc, oars=oars)
+        if reflect:
+            g += (f'<g transform="translate(0,{2*(hz+6)}) scale(1,-1)" opacity="0.30" filter="url(#blurref)">'
+                  f'{longship(sx, hz + 6, sc, oars=oars)}</g>')
+        return g
+    y = hz - SHIP_DRAFT * sc
+    clip = f'<clipPath id="above{uid}"><rect x="0" y="-100000" width="1000000" height="{100000 + hz:.2f}"/></clipPath>'
+    g = clip + f'<g clip-path="url(#above{uid})">{longship(sx, y, sc, oars=False)}</g>'
+    if oars:
+        g += longship_oars(sx, y, sc)            # oars reach down into the water: not clipped
+    if reflect:
+        g += (f'<g transform="translate(0,{2*hz:.2f}) scale(1,-1)" opacity="0.30" filter="url(#blurref)">'
+              f'<g clip-path="url(#above{uid})">{longship(sx, y, sc, oars=False)}</g></g>')
     return g
 
 
@@ -337,7 +373,7 @@ def _fjord_defs(w, h):
     return defs
 
 
-def wallpaper_fjord(w=3840, h=2160, seed=11, ship_x=0.36, ship_scale=2.6):
+def wallpaper_fjord(w=3840, h=2160, seed=11, ship_x=0.36, ship_scale=2.6, afloat=False):
     rnd = random.Random(seed)
     hz = h * 0.62  # horizon / waterline
     defs = _fjord_defs(w, h)
@@ -366,9 +402,7 @@ def wallpaper_fjord(w=3840, h=2160, seed=11, ship_x=0.36, ship_scale=2.6):
         b += f'<rect x="{x:.0f}" y="{y:.0f}" width="{ln:.0f}" height="3" fill="{GOLD_HI}" opacity="{rnd.uniform(0.15, 0.6):.2f}"/>'
     # the ship + its reflection
     sx, sc = w * ship_x, ship_scale
-    b += longship(sx, hz + 6, sc)
-    b += (f'<g transform="translate(0,{2*(hz+6)}) scale(1,-1)" opacity="0.30" filter="url(#blurref)">'
-          f'{longship(sx, hz + 6, sc)}</g>')
+    b += ship_on_water(sx, hz, sc, afloat=afloat)
     # ripples
     for _ in range(140):
         x = rnd.uniform(0, w)
@@ -427,7 +461,7 @@ def desktop_fjord_layers(w=3840, h=2160, seed=11, ship_x=0.36, ship_scale=2.6):
             "ripples": svg(w, h, rip, defs), "ship": svg(w, h, ship, defs)}
 
 
-def fjord_layers(w=1440, h=3120, seed=11, ship_x=0.40, ship_scale=1.85):
+def fjord_layers(w=1440, h=3120, seed=11, ship_x=0.40, ship_scale=1.85, afloat=False, live=False):
     """The phone fjord split for the living wallpaper: 'land' (mountains only) and
     'ship' (longship, its reflection, ripples), both on transparent ground. Uses the
     same random sequence as wallpaper_fjord, so the mountains match it exactly."""
@@ -449,9 +483,8 @@ def fjord_layers(w=1440, h=3120, seed=11, ship_x=0.40, ship_scale=1.85):
             '<stop offset="1" stop-color="#000" stop-opacity="0.65"/></linearGradient>'
             '<filter id="blurref"><feGaussianBlur stdDeviation="3 10"/></filter>')
     sx, sc = w * ship_x, ship_scale
-    ship = longship(sx, hz + 6, sc)
-    ship += (f'<g transform="translate(0,{2*(hz+6)}) scale(1,-1)" opacity="0.30" filter="url(#blurref)">'
-             f'{longship(sx, hz + 6, sc)}</g>')
+    # live=True: the scene rows its own oars and draws the ship's reflection (both move with it)
+    ship = ship_on_water(sx, hz, sc, afloat=afloat, oars=not live, reflect=not live, uid="l")
     for _ in range(140):
         x = rnd.uniform(0, w)
         y = hz + rnd.uniform(10, h - hz) ** 1.0
