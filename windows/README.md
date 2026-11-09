@@ -12,7 +12,7 @@ Per-user only, no admin rights, no theme patchers, nothing injected into Explore
 | Icons | Shield icons for This PC, your user folder, Network and the Recycle Bin, plus Documents, Downloads, Pictures, Music and Videos. More emblems (Games, Code, Projects, Archive, Folder) for any folder: `Set-FolderIcon.ps1 -Path D:\Games -Icon Games` (or `-Reset`). |
 | Widgets | Rainmeter skins: a runic clock and Forge/Fire/Mind/Bifrost meters (CPU, GPU, RAM, network) in carved iron frames, top-right of the G9. Needs Rainmeter (`winget install Rainmeter.Rainmeter`, asks for admin). |
 | Colours | Dark mode, gold `#C8A25A` accent, dark taskbar/Start with gold highlights. |
-| Terminal | A "Yggdrasil" Windows Terminal profile + colour scheme, added as a fragment (your `settings.json` is untouched), opening with fastfetch and the same tree logo as Yggdrasil OS. fastfetch installs per-user through winget. |
+| Terminal | A "Yggdrasil" Windows Terminal profile + colour scheme, added as a fragment (your `settings.json` is untouched), matching the Konsole profile on Yggdrasil OS: same colours, 94% opacity with blur, I-beam cursor, the `ᚤ user@host ~\path ᚱ` rune prompt, and the world tree (fastfetch, same logo and layout) once per sign-in; type `yggdrasil` to show it again. fastfetch installs per-user through winget. |
 | Font | Yggdrasil Runic, installed for your account only. |
 
 Runes follow the Yggdrasil rule: never sowilo, tiwaz, algiz, othala or jera (`win_art.py` filters them).

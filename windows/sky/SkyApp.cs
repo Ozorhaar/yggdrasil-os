@@ -208,8 +208,11 @@ internal sealed class SkyApp : ApplicationContext
 
     static void Play(string name)
     {
-        string wav = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Yggdrasil", "Theme", "Sounds", $"Yggdrasil - {name}.wav");
+        // Install.ps1 records which build's theme folder is current.
+        string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Yggdrasil", "Theme");
+        string theme = root;
+        try { var c = File.ReadAllText(Path.Combine(root, "current.txt")).Trim(); if (Directory.Exists(c)) theme = c; } catch { }
+        string wav = Path.Combine(theme, "Sounds", $"Yggdrasil - {name}.wav");
         try { if (File.Exists(wav)) new System.Media.SoundPlayer(wav).Play(); }
         catch (Exception e) { Log.Write("sound: " + e.Message); }
     }
