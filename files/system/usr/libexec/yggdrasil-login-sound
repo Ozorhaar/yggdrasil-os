@@ -1,0 +1,18 @@
+#!/usr/bin/bash
+# Plays the Yggdrasil login sound (run from /etc/xdg/autostart).
+# It plays as a *notification* sound, so it follows the "Notification Sounds"
+# slider in System Settings → Sound as well as the speaker volume.
+# Choose it with:  yggdrasil-theme login-sound <chiptune|horn|off>
+c="${XDG_CONFIG_HOME:-$HOME/.config}/yggdrasil"
+[ -e "$c/login-sound-off" ] && exit 0
+f="$c/login-sound.oga"
+[ -e "$f" ] || f=/usr/share/sounds/yggdrasil/stereo/desktop-login.oga
+
+# wait (up to 10 s) for the speakers to appear, so their saved volume is applied
+for _ in $(seq 20); do
+    wpctl inspect @DEFAULT_AUDIO_SINK@ >/dev/null 2>&1 && break
+    sleep 0.5
+done
+sleep 1
+exec pw-play --media-role=Notification \
+    -P '{ application.name = "Yggdrasil login sound" application.id = "org.yggdrasil.login-sound" }' "$f"

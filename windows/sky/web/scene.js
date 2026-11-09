@@ -178,9 +178,13 @@ function draw(uptime) {
   const grey = mix(hex(0x2A2E36), hex(0x8A919C), light);
   const top = mix(p.top, grey, cloud * 0.8), mid = mix(p.mid, grey, cloud * 0.85), hor = mix(p.hor, grey, cloud * 0.75);
 
-  // layout: the layers are ART_W x ART_H, cover-cropped to the screen
+  // layout: the layers are ART_W x ART_H, cover-cropped to the screen. On screens narrower than
+  // the G9 the crop slides just far enough to keep the steading (lantern post included) and the
+  // longship in view; when everything already fits it stays centred.
   const s = Math.max(w / ART_W, h / ART_H);
-  const ox = (w - ART_W * s) / 2, oy = (h - ART_H * s) / 2;
+  const vw = w / s, cx = vw >= FOCUS_R - FOCUS_L
+    ? clamp(ART_W / 2, FOCUS_R - vw / 2, FOCUS_L + vw / 2) : (FOCUS_L + FOCUS_R) / 2;
+  const ox = w / 2 - clamp(cx, Math.min(vw, ART_W) / 2, ART_W - Math.min(vw, ART_W) / 2) * s, oy = (h - ART_H * s) / 2;
   const hz = oy + ART_H * s * HZ;
   const u = h / 1440;                       // size unit (1 on the G9)
 
@@ -378,9 +382,7 @@ function draw(uptime) {
       g.addColorStop(0, rgba(hex(0xECD08F), 0.32 * sun * fade)); g.addColorStop(1, rgba(hex(0xECD08F), 0));
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, rr, 0, 6.283); ctx.fill();
     }
-    if (shipRefl) {   // its reflection, below its own waterline
-      ctx.globalAlpha = 0.30 * fade; ctx.drawImage(shipRefl, SHIP_BOX[0], SHIP.wl); ctx.globalAlpha = 1;
-    }
+    if (shipRefl) drawShipReflection(t, fade, rowing);   // below its own waterline, rippling
     ctx.globalAlpha = fade; ctx.drawImage(shipTint, 0, 0); ctx.globalAlpha = 1;
     drawOars(t, fade, p.dark, rowing);   // the near side's oars, in front of the hull
     if (sun > 0.02 && sailMask) {
@@ -540,6 +542,8 @@ const SAIL = [...shipPt(100, -172), ...shipPt(300, -26)];             // sail cl
 const MAST_TOP = shipPt(200, -185);
 const SHIP_BOX = [...shipPt(-30, -192), ...shipPt(452, SHIP.draft)];  // everything above the water
 const OAR_PORTS = Array.from({ length: 9 }, (_, i) => shipPt(70 + i * 34, 2));
+// what a narrow screen's crop keeps in view: from left of the lantern post to past the stern
+const FOCUS_L = HALL_L - 180, FOCUS_R = SHIP_BOX[2] + 80;
 const OAR_LEN = 40.2 * SHIP.s, OAR_REST = Math.atan2(36, -18);       // the still art's oar angle
 const SOLAR_FULL_W = 7000;
 const NAME = "Jason";
@@ -900,6 +904,22 @@ function mirrorShip(img, prev) {
 }
 
 /**
+ * The longship's reflection, drawn in thin bands that sway sideways like the water's surface:
+ * barely at the waterline, more with depth (and more while it rows), fading as it goes down.
+ */
+function drawShipReflection(t, fade, rowing) {
+  const img = shipRefl, bw = img.width, bh = img.height, band = 5;
+  const amp = rowing ? 9 : 5;
+  for (let y = 0; y < bh; y += band) {
+    const d = y / bh;
+    const dx = amp * d * Math.sin(y * 0.09 + t * 0.0016) + amp * 0.4 * d * Math.sin(y * 0.031 - t * 0.0011);
+    ctx.globalAlpha = (0.32 - 0.20 * d) * fade;
+    ctx.drawImage(img, 0, y, bw, Math.min(band, bh - y), SHIP_BOX[0] + dx, SHIP.wl + y, bw, Math.min(band, bh - y));
+  }
+  ctx.globalAlpha = 1;
+}
+
+/**
  * The oars on the near side, from the ports below the shields down to the water. Seen from here an
  * oar reaching toward you meets the water below the hull's own waterline, so only the blade goes
  * under. While rowing they sweep back with the blade in, then lift and swing forward again;
@@ -912,6 +932,15 @@ function drawOars(t, fade, dark, rowing) {
   const lift = rowing ? Math.max(0, Math.cos(ph)) : 0;     // 0 = blade in the water, 1 = clear of it
   const len = OAR_LEN * (1 - 0.16 * lift);
   ctx.lineCap = "round";
+  // their reflections first: each shaft mirrored about the spot where it meets the water
+  const ra = Math.cos(OAR_REST), rs = Math.sin(OAR_REST);
+  ctx.strokeStyle = rgba(wood, 0.22 * fade); ctx.lineWidth = 5;
+  for (const [px, py] of OAR_PORTS) {
+    const wy = py + rs * OAR_LEN * 0.76;                          // the oar's own waterline
+    const ca = Math.cos(a), sa = Math.sin(a), bx = px + ca * len * 0.76, by = py + sa * len * 0.76;
+    const ty = Math.min(by, wy), tx = px + (bx - px) * (ty - py) / (by - py || 1);
+    ctx.beginPath(); ctx.moveTo(tx, 2 * wy - ty); ctx.lineTo(px, 2 * wy - py); ctx.stroke();
+  }
   for (const [px, py] of OAR_PORTS) {
     const ca = Math.cos(a), sa = Math.sin(a), ex = px + ca * len, ey = py + sa * len;
     const bx = px + ca * len * 0.76, by = py + sa * len * 0.76;

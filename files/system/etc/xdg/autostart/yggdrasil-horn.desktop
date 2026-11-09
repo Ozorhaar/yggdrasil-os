@@ -2,7 +2,7 @@
 Type=Application
 Name=Yggdrasil login sound
 Comment=Plays the Mountain King chiptune when you log in (change with: yggdrasil-theme login-sound <chiptune|horn|off>)
-Exec=sh -c 'c="${XDG_CONFIG_HOME:-$HOME/.config}/yggdrasil"; [ -e "$c/login-sound-off" ] && exit 0; f="$c/login-sound.oga"; [ -e "$f" ] || f=/usr/share/sounds/yggdrasil/stereo/desktop-login.oga; sleep 2; pw-play --volume=0.6 "$f"'
+Exec=/usr/libexec/yggdrasil-login-sound
 Icon=yggdrasil-logo
 OnlyShowIn=KDE;
 X-KDE-autostart-phase=2
