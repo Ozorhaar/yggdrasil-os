@@ -550,7 +550,7 @@ const shipPt = (u, v) => [SHIP.x + (u - 200) * SHIP.s, SHIP.wl + (v - SHIP.draft
 const SHIP_PIVOT = shipPt(212, SHIP.draft);                           // centre of the waterline
 const SAIL = [...shipPt(100, -172), ...shipPt(300, -26)];             // sail cloth box
 const MAST_TOP = shipPt(200, -185);
-const SHIP_BOX = [...shipPt(-30, -192), ...shipPt(452, SHIP.draft)];  // everything above the water
+const SHIP_BOX = [...shipPt(-80, -192), ...shipPt(480, SHIP.draft)];  // everything above the water (Freki to Geri)
 const OAR_PORTS = Array.from({ length: 9 }, (_, i) => shipPt(70 + i * 34, 2));
 // what a narrow screen's crop keeps in view: from left of the lantern post to past the stern
 const FOCUS_L = HALL_L - 180, FOCUS_R = SHIP_BOX[2] + 80;
@@ -938,18 +938,24 @@ function drawSail(t, fade, sun, gale) {
   };
   const grid = [];
   for (let j = 0; j <= R; j++) for (let i = 0; i <= C; i++) grid.push(pt(i / C, j / R));
-  const cells = [];
   for (let j = 0; j < R; j++) for (let i = 0; i < C; i++) {
     const q = [grid[j * (C + 1) + i], grid[j * (C + 1) + i + 1], grid[(j + 1) * (C + 1) + i], grid[(j + 1) * (C + 1) + i + 1]];
     const xs = q.map((p) => p[0]), ys = q.map((p) => p[1]);
     const bx = Math.min(...xs), by = Math.min(...ys), bw = Math.max(...xs) - bx, bh = Math.max(...ys) - by;
     g.drawImage(sailCloth, i * w / C, j * h / R, w / C, h / R, bx - 0.5, by - 0.5, bw + 1, bh + 1);
-    const u = (i + 0.5) / C, v = (j + 0.5) / R, edge = Math.abs(u - 0.5) * 2;
-    const lum = 1 - 0.28 * fill * edge * edge + 0.06 * fill * (1 - edge) - 0.05 * slack * v;
-    cells.push([bx - 0.5, by - 0.5, bw + 1, bh + 1, clamp(1 - lum, 0, 1)]);
   }
-  g.globalCompositeOperation = "source-atop";                     // light and shade on the cloth only
-  for (const [bx, by, bw, bh, d] of cells) if (d > 0.005) { g.fillStyle = `rgba(0,0,0,${d.toFixed(3)})`; g.fillRect(bx, by, bw, bh); }
+  // light and shade on the cloth only, as smooth gradients (the launcher's per-vertex shading):
+  // edges in shadow as it fills, the belly a touch lighter, a slack sail darker toward its foot
+  g.globalCompositeOperation = "source-atop";
+  const across = g.createLinearGradient(m, 0, m + w, 0);
+  for (let k = 0; k <= 10; k++) {
+    const u = k / 10, edge = Math.abs(u - 0.5) * 2, d = 0.28 * fill * edge * edge - 0.06 * fill * (1 - edge);
+    across.addColorStop(u, d > 0 ? `rgba(0,0,0,${d.toFixed(3)})` : `rgba(255,255,255,${(-d).toFixed(3)})`);
+  }
+  g.fillStyle = across; g.fillRect(0, 0, off.width, off.height);
+  const down = g.createLinearGradient(0, m, 0, m + h * 1.1);
+  down.addColorStop(0, "rgba(0,0,0,0)"); down.addColorStop(1, `rgba(0,0,0,${(0.05 * slack).toFixed(3)})`);
+  g.fillStyle = down; g.fillRect(0, 0, off.width, off.height);
   if (sun > 0.02) { g.fillStyle = rgba(hex(0xECD08F), 0.38 * sun); g.fillRect(0, 0, off.width, off.height); }   // the panels' power, caught in it
   g.globalCompositeOperation = "source-over";
   ctx.globalAlpha = fade; ctx.drawImage(off, x0 - m, y0 - m); ctx.globalAlpha = 1;

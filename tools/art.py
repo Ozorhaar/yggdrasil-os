@@ -281,13 +281,97 @@ def aurora(rnd, w, y0, bands=4):
 SHIP_DRAFT = 12   # ship units of hull under the water when afloat (the keel curve reaches 25)
 
 
+# The longship's stem and stern posts end in carved wolf heads: Odin's wolves, Geri at the bow
+# looking ahead and Freki at the stern watching behind. A head is drawn facing +x, in its
+# own units, from the back of its neck (-NECK_BACK, 0) round the ears, snout and open jaw to the
+# front of its neck (NECK_FRONT, 0).
+_WOLF = [
+    ("Q", (-14, -9), (-10, -21)),     # back of the head
+    ("L", (-15, -39)),                # back ear
+    ("L", (-2, -26)),
+    ("L", (2, -38)),                  # front ear
+    ("L", (8, -25)),
+    ("Q", (18, -27), (26, -21)),      # brow into the snout
+    ("L", (39, -16)),                 # nose
+    ("Q", (41, -13), (37, -11)),
+    ("L", (23, -11)),                 # under the upper jaw
+    ("L", (16, -7)),                  # the hinge of the jaw, set well back into a thick jaw
+    ("L", (34, -1)),                  # top of the lower jaw, out to its tip
+    ("Q", (34, 4), (25, 5)),          # chin
+    ("Q", (14, 6), (11, 0)),          # throat to the front of the neck
+]
+_WOLF_EYE = (15, -18)
+# fangs, as triangles (base, base, tip): three hang from the upper jaw, two rise from the lower
+_WOLF_TEETH = [
+    ((24.5, -11.2), (27.5, -11.2), (26, -7.2)),
+    ((29.4, -11.2), (32.4, -11.2), (30.9, -7.6)),
+    ((34.0, -11.2), (36.6, -11.2), (35.3, -8.4)),
+    ((22.6, -4.2), (25.6, -3.3), (24.4, -7.4)),
+    ((27.8, -2.6), (30.8, -1.7), (29.6, -5.6)),
+]
+_WOLF_K = 1.2                        # head size against the hull
+_NECK_BACK, _NECK_FRONT = 11, 11     # a stout neck: these are carved posts, not twigs
+_BOW_NECK = (424, -84)               # where the bow's head sits on its post
+_STERN_X = 400                       # the stern mirrors the bow about x = 200
+
+
+def _wolf(anchor, mirror):
+    """The head's outline as path commands. mirror=False runs back-of-neck to front (bow);
+    mirror=True is the stern's head, mirrored, run front-of-neck to back so the hull outline flows."""
+    ax, ay = anchor
+    if not mirror:
+        pt = lambda p: f"{ax + p[0] * _WOLF_K:.1f},{ay + p[1] * _WOLF_K:.1f}"  # noqa: E731
+        return " ".join(f"{op} " + " ".join(pt(q) for q in pts) for op, *pts in _WOLF)
+    # reverse the run: collect the points with the commands that end on them, then walk back
+    nodes = [(-_NECK_BACK, 0)]
+    segs = []
+    for op, *pts in _WOLF:
+        segs.append((op, pts[:-1], nodes[-1]))
+        nodes.append(pts[-1])
+    pt = lambda p: f"{_STERN_X - (ax + p[0] * _WOLF_K):.1f},{ay + p[1] * _WOLF_K:.1f}"  # noqa: E731
+    out = []
+    for op, ctrl, start in reversed(segs):
+        out.append(f"{op} " + " ".join(pt(q) for q in ctrl + [start]))
+    return " ".join(out)
+
+
+def _hull_path():
+    """The hull with stem and stern posts sweeping up out of it into the two wolf heads."""
+    bx, by = _BOW_NECK
+    sx = _STERN_X - bx
+    nb, nf = _NECK_BACK * _WOLF_K, _NECK_FRONT * _WOLF_K
+    return (f"M 376,-6 C 394,-14 {bx - nb:.1f},-40 {bx - nb:.1f},{by} "   # inside of the bow post
+            f"{_wolf(_BOW_NECK, False)} "                                  # Geri, at the bow
+            f"C {bx + nf:.1f},-34 410,0 376,4 "                            # outside of the bow post
+            f"Q 200,46 24,4 "                                              # the keel
+            f"C -10,0 {sx - nf:.1f},-34 {sx - nf:.1f},{by} "               # outside of the stern post
+            f"{_wolf(_BOW_NECK, True)} "                                   # Freki, at the stern, looking back
+            f"C {sx + nb:.1f},-40 6,-14 24,-6 Z")                          # inside of the stern post
+
+
+def _wolf_teeth():
+    """Both heads' fangs as SVG point lists (Geri's, then Freki's mirrored)."""
+    ax, ay = _BOW_NECK
+    out = []
+    for mirror in (False, True):
+        for tri in _WOLF_TEETH:
+            pts = []
+            for px, py in tri:
+                x = ax + px * _WOLF_K
+                pts.append(f"{_STERN_X - x if mirror else x:.1f},{ay + py * _WOLF_K:.1f}")
+            out.append(" ".join(pts))
+    return out
+
+
+_WOLF_EYES = [(_BOW_NECK[0] + _WOLF_EYE[0] * _WOLF_K, _BOW_NECK[1] + _WOLF_EYE[1] * _WOLF_K),
+              (_STERN_X - (_BOW_NECK[0] + _WOLF_EYE[0] * _WOLF_K), _BOW_NECK[1] + _WOLF_EYE[1] * _WOLF_K)]
+
+
 def longship(x, y, s, hull="#06080d", sail_a=EMBER, sail_b=BONE, shields=(GOLD, FROST, OAK), oars=True):
     """An original longship silhouette; (x,y)=waterline centre, s=scale. oars=False leaves the
     oars off (the living wallpapers row their own)."""
     T = f'transform="translate({x},{y}) scale({s}) translate(-200,0)"'
-    hullp = ("M -14,-78 C -10,-40 4,-8 30,4 Q 200,46 372,4 C 398,-6 414,-46 420,-96 "
-             "C 422,-112 444,-116 446,-100 C 448,-88 432,-86 434,-98 C 428,-60 412,-18 386,-6 "
-             "L 24,-6 C 8,-16 -4,-44 -6,-74 C -6,-90 -22,-92 -22,-80 C -22,-70 -12,-70 -14,-78 Z")
+    hullp = _hull_path()
     g = f'<g {T}>'
     # mast & yard
     g += f'<rect x="196" y="-185" width="8" height="182" fill="{hull}"/>'
@@ -300,9 +384,13 @@ def longship(x, y, s, hull="#06080d", sail_a=EMBER, sail_b=BONE, shields=(GOLD, 
         g += f'<rect x="{110 + i * 20}" y="-170" width="20" height="150" fill="{sail_a if i % 2 == 0 else sail_b}"/>'
     g += '<rect x="100" y="-170" width="200" height="150" fill="url(#sailshade)"/></g>'
     # rigging
-    for (x1, y1, x2, y2) in ((200, -182, -6, -70), (200, -182, 420, -92), (112, -166, 60, -6), (288, -166, 340, -6)):
+    for (x1, y1, x2, y2) in ((200, -182, -16, -72), (200, -182, 416, -72), (112, -166, 60, -6), (288, -166, 340, -6)):
         g += f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{hull}" stroke-width="2"/>'
     g += f'<path d="{hullp}" fill="{hull}"/>'
+    for ex, ey in _WOLF_EYES:                     # the wolves' eyes, a glint of gold
+        g += f'<circle cx="{ex}" cy="{ey}" r="2.6" fill="{GOLD}"/>'
+    for tooth in _wolf_teeth():                   # and their fangs
+        g += f'<polygon points="{tooth}" fill="{BONE}"/>'
     # shields along the gunwale
     for i, sx in enumerate(range(48, 356, 26)):
         col = shields[i % len(shields)]
