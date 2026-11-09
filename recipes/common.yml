@@ -13,6 +13,7 @@ modules:
         - papirus-icon-theme
         - google-noto-sans-runic-fonts
         - plymouth-plugin-script   # the boot splash is a Plymouth script theme
+        - qt6-qtwebengine          # the living fjord wallpaper runs its scene in a web view
 
   - type: script
     scripts:

@@ -13,7 +13,9 @@ internal sealed class Settings
     public bool PauseWhenCovered { get; set; } = true;  // maximised or full-screen window in front
     public bool Weather { get; set; } = true;
     public bool SignInHorn { get; set; } = true;        // horn call when Windows starts Sky at sign-in
-    public bool UnlockHorn { get; set; } = false;       // short horn on every unlock           // false = never touch the network; fixed 7:15 / 17:45 day
+    public bool UnlockHorn { get; set; } = false;       // short horn on every unlock
+    public bool Steading { get; set; } = true;          // the longhouse and longship follow the house (home network only)
+    public string SteadingUrl { get; set; } = "https://homelab.ozorhaar.com/steading";
 
     public static string Dir { get; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Yggdrasil", "Sky");

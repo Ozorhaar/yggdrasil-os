@@ -30,6 +30,15 @@ jobs:
           - recipe.yml
           - recipe-nvidia-legacy.yml
     steps:
+      # Yggdrasil OS's wallpaper runs the same scene as Windows: its copy must match windows/sky/web
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the living fjord matches Yggdrasil Sky
+        run: |
+          D=files/system/usr/share/plasma/wallpapers/org.yggdrasil.livingfjord/contents/web
+          for f in kde.html scene.js sky-land.png sky-ship.png; do cmp "windows/sky/web/$f" "$D/$f"; done
+
       # the build is fully handled by the reusable github action
       - name: Build Custom Image
         uses: blue-build/github-action@c295af864f2802fc6aea227507af43d35823db81 # v1.13.0

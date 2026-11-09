@@ -15,6 +15,7 @@ internal sealed class SkyApp : ApplicationContext
 
     readonly Settings settings = Settings.Load();
     readonly Weather weather;
+    readonly Steading steading;
     readonly NotifyIcon tray = new();
     readonly ToolStripMenuItem pauseItem = new("Pause");
     readonly System.Windows.Forms.Timer watch = new() { Interval = 500 };
@@ -25,17 +26,19 @@ internal sealed class SkyApp : ApplicationContext
     SkyView? view;
     bool ready, manualPause, locked, displayOff, creating;
     string mode = "running";            // running | soft (covered: stop drawing) | hard (hidden + suspended)
-    DateTime nextCreate = DateTime.MinValue, nextWeather = DateTime.MinValue;
+    DateTime nextCreate = DateTime.MinValue, nextWeather = DateTime.MinValue, nextSteading = DateTime.MinValue;
     int fixesLogged;
 
     public SkyApp(bool startup)
     {
         this.startup = startup;
         weather = new Weather(settings);
+        steading = new Steading(settings);
         power = new PowerWindow(off => { displayOff = off; Evaluate(); });
 
         var menu = new ContextMenuStrip();
         menu.Items.Add("Show the demo (80 s)", null, (_, _) => view?.Post(new { type = "demo" }));
+        menu.Items.Add("Preview the birthday", null, (_, _) => view?.Post(new { type = "feast" }));
         menu.Items.Add(pauseItem);
         pauseItem.Click += (_, _) => { manualPause = !manualPause; pauseItem.Text = manualPause ? "Resume" : "Pause"; Evaluate(); };
         menu.Items.Add("Refresh weather", null, async (_, _) => SendWeather(await weather.Refresh()));
@@ -94,13 +97,14 @@ internal sealed class SkyApp : ApplicationContext
         view.Post(new { type = "scale", scale = settings.RenderScale });
         SendWeather(weather.Last);
         if (weather.Stale) SendWeather(await weather.Refresh());
+        nextSteading = DateTime.MinValue;
         var want = mode; mode = "running";
         if (want != "running") _ = Apply(want); else Evaluate();
     }
 
     void SendWeather(Weather.Now? w)
     {
-        if (w != null && ready) view?.Post(new { type = "weather", code = w.Code, sunrise = w.Sunrise, sunset = w.Sunset });
+        if (w != null && ready) view?.Post(new { type = "weather", code = w.Code, sunrise = w.Sunrise, sunset = w.Sunset, tempF = w.TempF });
     }
 
     async void Tick()
@@ -125,6 +129,16 @@ internal sealed class SkyApp : ApplicationContext
         {
             nextWeather = DateTime.Now.AddMinutes(5);           // don't hammer the API when offline
             SendWeather(await weather.Refresh());
+        }
+        if (ready && mode == "running" && DateTime.Now >= nextSteading)
+        {
+            nextSteading = DateTime.Now.AddSeconds(30);
+            var got = await steading.Read();
+            if (got is { } g && view != null)
+            {
+                if (g.house is { } hs) view.Post(new { type = "house", house = hs });
+                if (g.kp is { } kp) view.Post(new { type = "kp", kp });
+            }
         }
         Evaluate();
     }

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- Yggdrasil OS's Plasma wallpaper: the same scene, fetching its own weather (Open-Meteo) and the
+     steading feed (the Mac mini, home network only). No other network, no inline script, no frames. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; img-src 'self'; style-src 'self' 'unsafe-inline'; connect-src https://api.open-meteo.com https://homelab.ozorhaar.com; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Yggdrasil Sky</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1220; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="sky"></canvas>
+<script src="scene.js"></script>
+</body>
+</html>
