@@ -104,7 +104,12 @@ internal sealed class SkyApp : ApplicationContext
 
     void SendWeather(Weather.Now? w)
     {
-        if (w != null && ready) view?.Post(new { type = "weather", code = w.Code, sunrise = w.Sunrise, sunset = w.Sunset, tempF = w.TempF });
+        if (w != null && ready) view?.Post(new
+        {
+            type = "weather", code = w.Code, sunrise = w.Sunrise, sunset = w.Sunset, tempF = w.TempF,
+            // SailWind off: no wind sent, so the sail hangs as on a light breeze (as on the launcher)
+            windMph = settings.SailWind ? w.WindMph : null, gustMph = settings.SailWind ? w.GustMph : null,
+        });
     }
 
     async void Tick()

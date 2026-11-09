@@ -12,6 +12,7 @@ internal sealed class Settings
     public double RenderScale { get; set; } = 1.0;      // 0.5-1: draw at lower resolution if the GPU ever struggles
     public bool PauseWhenCovered { get; set; } = true;  // maximised or full-screen window in front
     public bool Weather { get; set; } = true;
+    public bool SailWind { get; set; } = true;          // the longship's sail fills with the real wind
     public bool SignInHorn { get; set; } = true;        // horn call when Windows starts Sky at sign-in
     public bool UnlockHorn { get; set; } = false;       // short horn on every unlock
     public bool Steading { get; set; } = true;          // the longhouse and longship follow the house (home network only)

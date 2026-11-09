@@ -8,7 +8,8 @@ namespace Yggdrasil.Sky;
 /// </summary>
 internal sealed class Weather
 {
-    public sealed record Now(int Code, long Sunrise, long Sunset, long FetchedAt, double? TempF = null);
+    public sealed record Now(int Code, long Sunrise, long Sunset, long FetchedAt, double? TempF = null,
+                             double? WindMph = null, double? GustMph = null);
 
     static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(10) };
     readonly Settings settings;
@@ -29,7 +30,7 @@ internal sealed class Weather
     {
         if (!settings.Weather) return null;
         string url = FormattableString.Invariant(
-            $"https://api.open-meteo.com/v1/forecast?latitude={settings.Latitude:0.###}&longitude={settings.Longitude:0.###}&current=weather_code,temperature_2m&temperature_unit=fahrenheit&daily=sunrise,sunset&timezone=auto&forecast_days=1&timeformat=unixtime");
+            $"https://api.open-meteo.com/v1/forecast?latitude={settings.Latitude:0.###}&longitude={settings.Longitude:0.###}&current=weather_code,temperature_2m,wind_speed_10m,wind_gusts_10m&temperature_unit=fahrenheit&wind_speed_unit=mph&daily=sunrise,sunset&timezone=auto&forecast_days=1&timeformat=unixtime");
         try
         {
             using var doc = JsonDocument.Parse(await Http.GetStringAsync(url));
@@ -40,7 +41,9 @@ internal sealed class Weather
             long set = daily.GetProperty("sunset")[0].GetInt64() * 1000;
             if (code < 0 || code > 99 || set <= rise) return Last;   // ignore nonsense
             double? temp = root.GetProperty("current").TryGetProperty("temperature_2m", out var tp) && tp.ValueKind == JsonValueKind.Number ? tp.GetDouble() : null;
-            Last = new Now(code, rise, set, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), temp);
+            var cur = root.GetProperty("current");
+            double? Num(string name) => cur.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number ? Math.Clamp(v.GetDouble(), 0, 200) : null;
+            Last = new Now(code, rise, set, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), temp, Num("wind_speed_10m"), Num("wind_gusts_10m"));
             File.WriteAllText(cacheFile, JsonSerializer.Serialize(Last));
         }
         catch (Exception e) { Log.Write("weather: " + e.Message); }
