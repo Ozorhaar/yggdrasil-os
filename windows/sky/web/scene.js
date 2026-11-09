@@ -523,7 +523,7 @@ async function start() {
 // Yule, the solstice and Jason's name-day feast.
 
 // The shelf on the left-hand mountains, in the art's coordinates (5120 x 1440).
-const SHELF_Y = 420, SHELF_L0 = 1360, SHELF_L1 = 1410, SHELF_R1 = 1730, SHELF_R0 = 1780;
+const SHELF_Y = 420, SHELF_L0 = 1330, SHELF_L1 = 1388, SHELF_R1 = 1730, SHELF_R0 = 1780;
 const HALL_L = 1420, HALL_R = 1720;
 // The longship layer: the waterline pivot, the sail, the hull's oar line, the masthead.
 const SHIP_PIVOT = [2070, 893], SAIL = [1700, 560, 2240, 840], MAST_TOP = [2040, 530];
