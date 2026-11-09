@@ -13,9 +13,13 @@ kw() { kwriteconfig6 "$@" 2>/dev/null || true; }
 # Fedora ships the Qt 6 qdbus as qdbus-qt6 / qdbus, not qdbus6
 QDBUS=$(command -v qdbus6 || command -v qdbus-qt6 || command -v qdbus || echo true)
 
-# the lock screen keeps the still fjord (it can't run wallpaper plugins' motion)
+# the lock screen follows the desktop: the Living Fjord, or the same still picture
 set_lockscreen() {
-    local dir="$WALLS/Yggdrasil-${1:-Fjord}"
+    if [ "${1:-Living}" = Living ]; then
+        kw --file kscreenlockerrc --group Greeter --key WallpaperPlugin org.yggdrasil.livingfjord
+        return
+    fi
+    local dir="$WALLS/Yggdrasil-$1"
     kw --file kscreenlockerrc --group Greeter --key WallpaperPlugin org.kde.image
     kw --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image \
        --group General --key Image "file://$dir/"
@@ -25,7 +29,7 @@ set_living() {
     "$QDBUS" org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript \
         'for (const d of desktops()) { d.wallpaperPlugin = "org.yggdrasil.livingfjord"; }' \
         >/dev/null 2>&1 || true
-    set_lockscreen Fjord
+    set_lockscreen Living
 }
 
 set_wallpaper() {

@@ -55,18 +55,20 @@ cat > /etc/xdg/konsolerc <<'EOF'
 DefaultProfile=Yggdrasil.profile
 EOF
 
+# the lock screen runs the Living Fjord too (the still fjord stays set as the image fallback)
 cat > /etc/xdg/kscreenlockerrc <<'EOF'
 [Greeter]
-WallpaperPlugin=org.kde.image
+WallpaperPlugin=org.yggdrasil.livingfjord
 
 [Greeter][Wallpaper][org.kde.image][General]
 Image=file:///usr/share/wallpapers/Yggdrasil-Fjord/
 EOF
 
 # ---------------------------------------------------------------- login screen
-# Plasma Login Manager keeps the Breeze layout but takes our wallpaper.
+# Plasma Login Manager keeps the Breeze layout but runs the Living Fjord (the still fjord stays
+# configured underneath, for whenever the image plugin is picked again).
 if command -v kwriteconfig6 >/dev/null; then
-    kwriteconfig6 --file /etc/plasmalogin.conf --group Greeter --key WallpaperPluginId org.kde.image
+    kwriteconfig6 --file /etc/plasmalogin.conf --group Greeter --key WallpaperPluginId org.yggdrasil.livingfjord
     kwriteconfig6 --file /etc/plasmalogin.conf --group Greeter --group Wallpaper --group org.kde.image \
         --group General --key Image "file:///usr/share/wallpapers/Yggdrasil-Fjord/contents/images/3840x2160.jpg"
 fi
