@@ -29,6 +29,7 @@ let land = null, ship = null;
 let landTint = null, shipTint = null, tintKey = "";
 let fg = null, refl = null;           // cached: tinted land+ship, and the mountains' reflection
 let shipRefl = null;                  // cached: the longship mirrored about its own waterline
+let sailCloth = null, sailOff = null, sailFill = 0.3, sailAt = 0;   // the sail's cloth and how full the wind has it
 let ray = null, puff = null;
 let timer = 0, lastT = 0, flashAt = 0, nextFlash = 0;
 let W = 0, H = 0;
@@ -318,7 +319,8 @@ function draw(uptime) {
   if (key !== tintKey && land && ship) {
     landTint = tinted(land, landTint, l * (1 + 0.15 * p.glow), l, l * (1 - 0.1 * p.glow));
     shipTint = tinted(ship, shipTint, sl, sl, sl);
-    shipRefl = mirrorShip(shipTint, shipRefl);
+    shipRefl = mirrorShip(shipTint, shipRefl);      // the reflection keeps the sail as painted
+    sailCloth = cutSail(shipTint, sailCloth);       // the cloth is drawn on its own, shaped by the wind
     fg = landTint;      // the longship is drawn on its own now: it can sail off
     refl = refl || document.createElement("canvas"); refl.width = ART_W; refl.height = ART_H;
     const r = refl.getContext("2d"); r.clearRect(0, 0, ART_W, ART_H);
@@ -368,6 +370,7 @@ function draw(uptime) {
   if (shipOut !== outTarget) { const step = dt / 16; shipOut = shipOut < outTarget ? Math.min(outTarget, shipOut + step) : Math.max(outTarget, shipOut - step); }
   const sailing = shipOut !== outTarget;
   const rowing = sailing || (hs && hs.export > 150);
+  let gale = 0;
   if (shipTint && shipOut < 0.995) {
     const ss = shipOut * shipOut * (3 - 2 * shipOut), k = 1 - 0.9 * ss, fade = 1 - ss * ss * ss;
     const pivX = ox + SHIP_PIVOT[0] * s, pivY = oy + SHIP_PIVOT[1] * s;
@@ -384,11 +387,16 @@ function draw(uptime) {
     }
     if (shipRefl) drawShipReflection(t, fade, rowing);   // below its own waterline, rippling
     ctx.globalAlpha = fade; ctx.drawImage(shipTint, 0, 0); ctx.globalAlpha = 1;
+    // the sail, filled by the real wind (as on the launcher): slack in a calm, bellied out in a
+    // breeze, shuddering in a gale. In the demo the wind follows its weather.
+    const wx = state.weather;
+    const windNow = demo ? ({ 95: 40, 63: 18, 73: 14, 45: 2 })[demo.code] ?? 9 : wx && wx.windMph != null ? wx.windMph : 6;
+    const gustNow = demo ? windNow * 1.3 : wx && wx.gustMph != null ? wx.gustMph : 0;
+    const nowMs = Date.now(), sdt = sailAt ? Math.min(60, (nowMs - sailAt) / 1000) : 60; sailAt = nowMs;
+    sailFill += (clamp((windNow - 3) / 22, 0, 1) - sailFill) * Math.min(1, sdt / 3);
+    gale = clamp((Math.max(gustNow, windNow * 1.3) - 28) / 20, 0, 1);
+    drawSail(t, fade, sun, gale);
     drawOars(t, fade, p.dark, rowing);   // the near side's oars, in front of the hull
-    if (sun > 0.02 && sailMask) {
-      ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.45 * sun * fade;
-      ctx.drawImage(sailMask, sx0, sy0); ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
-    }
     if (feast) dressShip(t, fade);
     ctx.restore(); ctx.restore();
   }
@@ -397,7 +405,7 @@ function draw(uptime) {
   const precip = PRECIP[kind] || 0;
   if (precip) drawPrecip(w, h, dt, t, precip, kind === "snow", light, u);
 
-  return !!demo || auroraA > 0.03 || precip > 0 || kind === "thunder" || steadingMoves || sailing || rowing || fireworks || flare > 0;
+  return !!demo || auroraA > 0.03 || precip > 0 || kind === "thunder" || steadingMoves || sailing || rowing || fireworks || flare > 0 || gale > 0.02;
 }
 
 let puffTint = null, puffKey = "";
@@ -478,7 +486,8 @@ function load(src) { return new Promise((ok, bad) => { const i = new Image(); i.
 function onMessage(m) {
   if (!m || typeof m !== "object") return;
   switch (m.type) {
-    case "weather": state.weather = { code: m.code | 0, sunrise: +m.sunrise, sunset: +m.sunset, tempF: m.tempF == null ? null : +m.tempF }; break;
+    case "weather": state.weather = { code: m.code | 0, sunrise: +m.sunrise, sunset: +m.sunset, tempF: m.tempF == null ? null : +m.tempF,
+                                      windMph: m.windMph == null ? null : +m.windMph, gustMph: m.gustMph == null ? null : +m.gustMph }; break;
     case "house": state.house = m.house && typeof m.house === "object" ? m.house : null; break;
     case "kp": state.kp = m.kp == null ? null : +m.kp; break;
     case "feast": state.feastUntil = Date.now() + 75000; break;
@@ -510,6 +519,7 @@ async function start() {
   if (q.has("demo")) state.demoStart = Date.now();
   if (q.has("house")) state.house = JSON.parse(q.get("house"));
   if (q.has("kp")) state.kp = +q.get("kp");
+  if (q.has("wind")) state.weather = Object.assign(state.weather || {}, { windMph: +q.get("wind"), gustMph: +(q.get("gust") || 0) });
   if (q.has("feast")) state.feastUntil = Date.now() + 3600000;
   if (q.has("snow")) snowAt = Date.now();
 
@@ -892,6 +902,59 @@ function perchedRaven(x, y, L, bob, stick) {
 }
 
 /** Oars out of the hull, sweeping aft through the water and lifting back (in art coordinates). */
+/** The sail's cloth, tinted like the ship, cut out of it (the rest of the ship keeps its rigging). */
+function cutSail(img, prev) {
+  if (!sailMask) return null;
+  const [x0, y0, x1, y1] = SAIL, w = x1 - x0, h = y1 - y0;
+  const c = prev || document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d"); g.clearRect(0, 0, w, h);
+  g.drawImage(img, x0, y0, w, h, 0, 0, w, h);
+  g.globalCompositeOperation = "destination-in"; g.drawImage(sailMask, 0, 0); g.globalCompositeOperation = "source-over";
+  const s = img.getContext("2d");                                  // and take it out of the ship
+  s.globalCompositeOperation = "destination-out"; s.drawImage(sailMask, x0, y0); s.globalCompositeOperation = "source-over";
+  return c;
+}
+
+/**
+ * The sail drawn over a mesh, the launcher's shape: the yard along the top stays put;
+ * sailFill 0 hangs slack and wrinkled, 1 bellies out (fatter mid-height, the foot curving down,
+ * the edges in shadow); gale adds a fast shudder along the free edge. Art coordinates.
+ */
+function drawSail(t, fade, sun, gale) {
+  if (!sailCloth) return;
+  const [x0, y0, x1, y1] = SAIL, w = x1 - x0, h = y1 - y0, m = Math.ceil(w * 0.15);
+  const off = sailOff || (sailOff = document.createElement("canvas"));
+  if (off.width !== w + 2 * m || off.height !== h + 2 * m) { off.width = w + 2 * m; off.height = h + 2 * m; }
+  const g = off.getContext("2d"); g.clearRect(0, 0, off.width, off.height);
+  const C = 32, R = 24, fill = sailFill, slack = 1 - fill, PI = Math.PI;   // fine enough for smooth edges
+  const pt = (u, v) => {
+    const arc = Math.sin(PI * u);
+    let dx = (u - 0.5) * w * 0.10 * fill * Math.sin(PI * v);
+    let dy = h * (0.07 * fill * v * v + 0.03 * slack * v) * arc;
+    dx += w * 0.008 * slack * v * Math.sin(v * 9 + u * 2 + t * 0.0015);
+    dx += w * (0.004 + 0.014 * gale) * fill * v * u * Math.sin(t * (0.012 + 0.02 * gale) - u * 7 + v * 3);
+    if (gale > 0) dy += h * 0.01 * gale * v * Math.sin(t * 0.03 + u * 11);
+    return [m + u * w + dx, m + v * h + dy];
+  };
+  const grid = [];
+  for (let j = 0; j <= R; j++) for (let i = 0; i <= C; i++) grid.push(pt(i / C, j / R));
+  const cells = [];
+  for (let j = 0; j < R; j++) for (let i = 0; i < C; i++) {
+    const q = [grid[j * (C + 1) + i], grid[j * (C + 1) + i + 1], grid[(j + 1) * (C + 1) + i], grid[(j + 1) * (C + 1) + i + 1]];
+    const xs = q.map((p) => p[0]), ys = q.map((p) => p[1]);
+    const bx = Math.min(...xs), by = Math.min(...ys), bw = Math.max(...xs) - bx, bh = Math.max(...ys) - by;
+    g.drawImage(sailCloth, i * w / C, j * h / R, w / C, h / R, bx - 0.5, by - 0.5, bw + 1, bh + 1);
+    const u = (i + 0.5) / C, v = (j + 0.5) / R, edge = Math.abs(u - 0.5) * 2;
+    const lum = 1 - 0.28 * fill * edge * edge + 0.06 * fill * (1 - edge) - 0.05 * slack * v;
+    cells.push([bx - 0.5, by - 0.5, bw + 1, bh + 1, clamp(1 - lum, 0, 1)]);
+  }
+  g.globalCompositeOperation = "source-atop";                     // light and shade on the cloth only
+  for (const [bx, by, bw, bh, d] of cells) if (d > 0.005) { g.fillStyle = `rgba(0,0,0,${d.toFixed(3)})`; g.fillRect(bx, by, bw, bh); }
+  if (sun > 0.02) { g.fillStyle = rgba(hex(0xECD08F), 0.38 * sun); g.fillRect(0, 0, off.width, off.height); }   // the panels' power, caught in it
+  g.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = fade; ctx.drawImage(off, x0 - m, y0 - m); ctx.globalAlpha = 1;
+}
+
 /** The longship's reflection: the part above the water, flipped about the waterline and softened. */
 function mirrorShip(img, prev) {
   const [x0, y0, x1, y1] = SHIP_BOX, w = Math.ceil(x1 - x0), h = Math.ceil(y1 - y0);
@@ -929,7 +992,9 @@ function drawOars(t, fade, dark, rowing) {
   const wood = mix(hex(0x6B5032), hex(0x1C150F), dark);
   const ph = t * 0.0026;
   const a = rowing ? OAR_REST + 0.34 * Math.sin(ph) : OAR_REST + 0.08;
-  const lift = rowing ? Math.max(0, Math.cos(ph)) : 0;     // 0 = blade in the water, 1 = clear of it
+  // The ship heads right (bow to the right): the blades catch forward and pull aft (leftward) while
+  // in the water, then lift clear for the return, as on the launcher. 0 = in the water, 1 = clear.
+  const lift = rowing ? Math.max(0, -Math.cos(ph)) : 0;
   const len = OAR_LEN * (1 - 0.16 * lift);
   ctx.lineCap = "round";
   // their reflections first: each shaft mirrored about the spot where it meets the water
@@ -1001,9 +1066,11 @@ function selfHost(lat, lon, feed) {
   async function weather() {
     try {
       const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}` +
-        "&current=weather_code,temperature_2m&temperature_unit=fahrenheit&daily=sunrise,sunset&timezone=auto&forecast_days=1&timeformat=unixtime");
+        "&current=weather_code,temperature_2m,wind_speed_10m,wind_gusts_10m&temperature_unit=fahrenheit&wind_speed_unit=mph" +
+        "&daily=sunrise,sunset&timezone=auto&forecast_days=1&timeformat=unixtime");
       const j = await r.json();
       onMessage({ type: "weather", code: j.current.weather_code, tempF: j.current.temperature_2m,
+        windMph: j.current.wind_speed_10m, gustMph: j.current.wind_gusts_10m,
         sunrise: j.daily.sunrise[0] * 1000, sunset: j.daily.sunset[0] * 1000 });
     } catch (e) { /* offline: keep the last sky */ }
   }

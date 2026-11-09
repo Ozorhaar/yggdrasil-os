@@ -30,7 +30,7 @@ Runes follow the Yggdrasil rule: never sowilo, tiwaz, algiz, othala or jera (`wi
 
 `Uninstall.ps1` stops Sky, removes everything and restores the backup.
 
-Sky's settings: `%LOCALAPPDATA%\Yggdrasil\Sky\settings.json` (location, `Fps`, `CalmFps`, `RenderScale`, `PauseWhenCovered`, `Weather`, `SignInHorn`, `UnlockHorn`). Log: `sky.log` in the same folder.
+Sky's settings: `%LOCALAPPDATA%\Yggdrasil\Sky\settings.json` (location, `Fps`, `CalmFps`, `RenderScale`, `SailWind`, `PauseWhenCovered`, `Weather`, `SignInHorn`, `UnlockHorn`). Log: `sky.log` in the same folder.
 
 ## Build
 
