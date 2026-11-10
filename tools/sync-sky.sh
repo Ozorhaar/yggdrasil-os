@@ -6,5 +6,5 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SRC="$ROOT/windows/sky/web"
 DST="$ROOT/files/system/usr/share/plasma/wallpapers/org.yggdrasil.livingfjord/contents/web"
 mkdir -p "$DST"
-for f in kde.html scene.js sky-land.png sky-ship.png; do cp "$SRC/$f" "$DST/$f"; done
+for f in kde.html props.js scene.js sky-land.png sky-ship.png; do cp "$SRC/$f" "$DST/$f"; done
 echo "synced $(ls "$DST" | wc -l | tr -d ' ') files into the Plasma wallpaper"

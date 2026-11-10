@@ -362,6 +362,8 @@ function draw(uptime) {
   const flareAge = realNow - flareAt;
   const flare = flareAge >= 0 && flareAge < 20000 ? (1 - flareAge / 20000) * (0.6 + 0.4 * Math.sin(t * 0.01)) : 0;
   const steadingMoves = drawSteading({ s, ox, oy, t, light, dark: p.dark, snow: snowCover, house: hs, feast, flare });
+  // the places where the launcher's folders live (here without taps, so the fjords stay one world)
+  drawPlaces({ s, ox, oy, t, light, dark: p.dark, forge: !!(hs && hs.forge) });
 
   // the longship: it sails out of the fjord when no one's home and back when someone is,
   // rows while the house sends power to the grid, and its sail glows with the panels
@@ -561,6 +563,22 @@ const NAME = "Jason";
 let groundTops = null;      // top of the ground per art column (after levelling)
 let sailMask = null;        // just the sail's cloth, for lighting it
 let tree = null;            // the World Tree silhouette
+
+// The places where the launcher's folders live, drawn by props.js (the launcher's Props.kt draws the same):
+// [prop, art x, art y of its foot, or null to stand on the ground there]
+const PLACES = [["runestone", 900, null], ["cave", 520, 700], ["skald", 1150, SHIP.wl], ["smithy", 4050, null],
+  ["cookfire", 3560, SHIP.wl], ["knarr", 3950, 990]];
+
+function drawPlaces(o) {
+  if (typeof Props === "undefined" || !groundTops) return;
+  const po = { light: o.light, dark: o.dark, t: o.t, forge: o.forge };
+  for (const [name, ax, ay] of PLACES) {
+    const y = ay ?? groundTops[Math.round(ax)] + 2;
+    ctx.save(); ctx.translate(o.ox + ax * o.s, o.oy + y * o.s); ctx.scale(o.s, o.s);
+    Props[name](ctx, po);
+    ctx.restore();
+  }
+}
 
 /** Levels the shelf into the land art (peaks cut away, dips filled with each column's own surface). */
 function levelShelf(img) {
@@ -790,7 +808,7 @@ function drawSteading(o) {
   }
 
   // the forge: while the printer works, a stone chimney near the right end throws sparks
-  if (hs && hs.forge) {
+  if (hs && hs.forge && typeof Props === "undefined") {      // (with the places, the smithy's chimney sparks instead)
     const cx = r - 72 * s, ctop = ridge + 6 * s;
     ctx.fillStyle = rgba(mix(hex(0x2A2C30), hex(0x6A6660), light)); ctx.fillRect(cx - 7 * s, ctop - 18 * s, 14 * s, 32 * s);
     const heat = 0.75 + 0.25 * Math.sin(t * 0.011);

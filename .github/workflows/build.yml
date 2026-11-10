@@ -37,7 +37,7 @@ jobs:
       - name: Check the living fjord matches Yggdrasil Sky
         run: |
           D=files/system/usr/share/plasma/wallpapers/org.yggdrasil.livingfjord/contents/web
-          for f in kde.html scene.js sky-land.png sky-ship.png; do cmp "windows/sky/web/$f" "$D/$f"; done
+          for f in kde.html props.js scene.js sky-land.png sky-ship.png; do cmp "windows/sky/web/$f" "$D/$f"; done
 
       # the build is fully handled by the reusable github action
       - name: Build Custom Image
