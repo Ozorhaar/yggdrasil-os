@@ -1,12 +1,16 @@
 #!/usr/bin/bash
 # Plays the Yggdrasil login sound (run from /etc/xdg/autostart).
-# It plays as a *notification* sound, so it follows the "Notification Sounds"
-# slider in System Settings → Sound as well as the speaker volume.
+# It plays at its own volume (10% unless you set another), scaled by the speaker volume.
 # Choose it with:  yggdrasil-theme login-sound <chiptune|horn|off>
+#                  yggdrasil-theme login-sound volume <1-100>
 c="${XDG_CONFIG_HOME:-$HOME/.config}/yggdrasil"
 [ -e "$c/login-sound-off" ] && exit 0
 f="$c/login-sound.oga"
 [ -e "$f" ] || f=/usr/share/sounds/yggdrasil/stereo/desktop-login.oga
+pct=$(cat "$c/login-sound-volume" 2>/dev/null)
+case "$pct" in ''|*[!0-9]*) pct=10 ;; esac
+[ "$pct" -ge 1 ] && [ "$pct" -le 100 ] || pct=10
+vol=$(awk -v p="$pct" 'BEGIN { printf "%.2f", p / 100 }')
 
 # wait (up to 10 s) for the speakers to appear, so their saved volume is applied
 for _ in $(seq 20); do
@@ -14,5 +18,6 @@ for _ in $(seq 20); do
     sleep 0.5
 done
 sleep 1
-exec pw-play --media-role=Notification \
-    -P '{ application.name = "Yggdrasil login sound" application.id = "org.yggdrasil.login-sound" }' "$f"
+# state.restore-props = false: otherwise the audio server re-applies a remembered volume over ours
+exec pw-play --media-role=Notification --volume="$vol" \
+    -P '{ application.name = "Yggdrasil login sound" application.id = "org.yggdrasil.login-sound" state.restore-props = false }' "$f"

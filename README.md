@@ -57,7 +57,7 @@ yggdrasil-theme wallpaper WorldTree # Fjord | WorldTree | Iron
 yggdrasil                           # world-tree system info
 ```
 
-* Login sound: `yggdrasil-theme login-sound chiptune|horn|off` (the war horn is still there if you prefer it).
+* Login sound: `yggdrasil-theme login-sound chiptune|horn|off` (the war horn is still there if you prefer it); `yggdrasil-theme login-sound volume 1-100` sets its level (default 10).
 * Plain prompt: `export YGG_PLAIN_PROMPT=1` in `~/.bashrc`. No greeting: `YGG_NO_GREETING=1`.
 * Login screen colours: System Settings → Login Screen → *Apply Plasma Settings*.
 

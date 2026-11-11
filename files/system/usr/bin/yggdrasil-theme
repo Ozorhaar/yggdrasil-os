@@ -4,6 +4,7 @@
 #   yggdrasil-theme --first-run  apply once per user (used by autostart)
 #   yggdrasil-theme wallpaper <Living|Fjord|WorldTree|Iron>
 #   yggdrasil-theme login-sound <chiptune|horn|off>
+#   yggdrasil-theme login-sound volume <1-100>      (default 10)
 set -u
 STATE="${XDG_CONFIG_HOME:-$HOME/.config}/yggdrasil"
 MARKER="$STATE/theme-applied-v1"
@@ -88,7 +89,11 @@ case "${1:-}" in
             chiptune) rm -f "$STATE/login-sound.oga" "$STATE/login-sound-off" ;;
             horn)     rm -f "$STATE/login-sound-off"; ln -sfn "$SND/desktop-login-horn.oga" "$STATE/login-sound.oga" ;;
             off)      touch "$STATE/login-sound-off" ;;
-            *) echo "usage: yggdrasil-theme login-sound <chiptune|horn|off>"; exit 1 ;;
+            volume)
+                case "${3:-}" in ''|*[!0-9]*) echo "usage: yggdrasil-theme login-sound volume <1-100>"; exit 1 ;; esac
+                if [ "$3" -lt 1 ] || [ "$3" -gt 100 ]; then echo "volume must be 1-100"; exit 1; fi
+                echo "$3" > "$STATE/login-sound-volume"; echo "Login sound volume: $3%"; exit 0 ;;
+            *) echo "usage: yggdrasil-theme login-sound <chiptune|horn|off|volume N>"; exit 1 ;;
         esac
         echo "Login sound: $2"
         ;;
