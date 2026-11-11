@@ -76,6 +76,9 @@ const Props = (() => {
 
   /** Video: a skald by a little fire on the shore, his lyre on his knee. */
   function skald(g, o) {
+    // a low hump of the ridge itself under him and his fire, so they sit on any ground
+    g.fillStyle = rgba(mix(0x1a151f, 0x3b2f45, o.light));
+    g.beginPath(); g.moveTo(-50, 16); g.quadraticCurveTo(-40, 1, -20, 0); g.lineTo(44, 0); g.quadraticCurveTo(60, 1, 68, 16); g.closePath(); g.fill();
     glow(g, 22, -10, 58, 0.25 + 0.45 * o.dark);
     g.fillStyle = rgba(rock(o));
     for (let k = -2; k <= 2; k++) { g.beginPath(); g.arc(22 + k * 6, 0, 3.4, 0, 6.2832); g.fill(); }
