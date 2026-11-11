@@ -565,15 +565,29 @@ let sailMask = null;        // just the sail's cloth, for lighting it
 let tree = null;            // the World Tree silhouette
 
 // The places where the launcher's folders live, drawn by props.js (the launcher's Props.kt draws the same):
-// [prop, art x, art y of its foot, or null to stand on the ground there]
-const PLACES = [["runestone", 900, null], ["cave", 520, 700], ["skald", 1150, SHIP.wl], ["smithy", 4050, null],
-  ["cookfire", 3560, SHIP.wl], ["knarr", 3950, 990]];
+// [prop, art x, where its foot goes, its footprint left and right of x (art px)]
+//   a number    - that art y (the cave in the mountainside, the knarr on the water)
+//   "ground"    - on the land, at the lowest ground under the whole footprint, so on a slope the
+//                 base settles into the hillside instead of hanging off its downhill side
+//   "shore"     - on the foot of the mountain just above the water. On the desktop the mountains
+//                 run straight down into the fjord, so the waterline itself is water, not shore.
+const SHORE = SHIP.wl - 22;
+const PLACES = [["runestone", 900, "ground", -14, 14], ["cave", 520, 700], ["skald", 1150, "shore"],
+  ["smithy", 4050, "ground", -92, 60], ["cookfire", 3720, "shore"], ["knarr", 3950, 990]];
+
+function placeY(ax, at, l, r) {
+  if (typeof at === "number") return at;
+  if (at === "shore") return SHORE;
+  let y = 0;
+  for (let x = Math.round(ax + l); x <= Math.round(ax + r); x++) y = Math.max(y, groundTops[x]);
+  return y + 2;
+}
 
 function drawPlaces(o) {
   if (typeof Props === "undefined" || !groundTops) return;
   const po = { light: o.light, dark: o.dark, t: o.t, forge: o.forge };
-  for (const [name, ax, ay] of PLACES) {
-    const y = ay ?? groundTops[Math.round(ax)] + 2;
+  for (const [name, ax, at, l = 0, r = 0] of PLACES) {
+    const y = placeY(ax, at, l, r);
     ctx.save(); ctx.translate(o.ox + ax * o.s, o.oy + y * o.s); ctx.scale(o.s, o.s);
     Props[name](ctx, po);
     ctx.restore();
