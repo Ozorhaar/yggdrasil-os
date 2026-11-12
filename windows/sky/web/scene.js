@@ -23,8 +23,10 @@ const state = {
   feastUntil: 0,          // "Preview the birthday": the name-day feast until this time
 };
 let shipOut = -1, flareAt = 0, lastHomeSince = 0;
-let snowAt = 0;
-try { snowAt = +(localStorage.getItem("snowAt") || 0); } catch (e) { }
+let snowAt = 0, coldSince = 0, rainAt = 0;
+try { snowAt = +(localStorage.getItem("snowAt") || 0); coldSince = +(localStorage.getItem("coldSince") || 0); rainAt = +(localStorage.getItem("rainAt") || 0); } catch (e) { }
+const remember = (k, v) => { try { localStorage.setItem(k, String(v)); } catch (e) { } };
+let moonLight = 0, frostK = 0, beached = false;
 let land = null, ship = null;
 let landTint = null, shipTint = null, tintKey = "";
 let fg = null, refl = null;           // cached: tinted land+ship, and the mountains' reflection
@@ -213,6 +215,14 @@ function draw(uptime) {
   const mAge = moonAge(now), mLit = moonLit(mAge);
   const moonA = Math.max(0, p.dark - 0.5) * 2 * (1 - cloud) * (0.25 + 0.75 * mLit);
   const mx = w * 0.78, my = h * 0.16, mr = 40 * u;
+  const nightK = clamp((p.dark - 0.5) * 2, 0, 1);
+  moonLight = nightK * Math.max(0.22, mLit * (1 - 0.65 * cloud));     // never below a little starlight
+  const veiled = nightK * cloud * mLit;
+  if (veiled > 0.02) {
+    gr = ctx.createRadialGradient(mx, my, 0, mx, my, mr * 9);
+    gr.addColorStop(0, rgba(hex(0xDCE4F2), 0.28 * veiled)); gr.addColorStop(1, "rgba(220,228,242,0)");
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(mx, my, mr * 9, 0, 6.283); ctx.fill();
+  }
   if (moonA > 0.02) {
     gr = ctx.createRadialGradient(mx, my, 0, mx, my, mr * 5);
     gr.addColorStop(0, rgba(hex(0xE8F0FF), 0.35 * moonA * mLit)); gr.addColorStop(1, "rgba(232,240,255,0)");
@@ -240,19 +250,43 @@ function draw(uptime) {
   const auroraA = auroraNight * clamp((p.dark - 0.65) / 0.35, 0, 1) * clamp(1 - cloud * 2.2, 0, 1);
   if (auroraA > 0.03) drawAurora(w, h, hz, t, auroraA);
 
+  // the seasons (as the launcher): snow lies while it falls and for a day and a half after while it
+  // stays at freezing; two days at 20°F or colder ices the fjord's edges (the knarr is drawn up on the
+  // shore) until it reaches 28°F; rain leaves a rainbow when the sun comes out; at or below freezing
+  // with no snow lying, hoarfrost
+  const tempF = state.weather && state.weather.tempF;
+  if (!demo && kind === "snow" && realNow - snowAt > 600000) { snowAt = realNow; remember("snowAt", snowAt); }
+  const snowCover = kind === "snow" || (!demo && realNow - snowAt < 36 * 3600000 && tempF != null && tempF <= 33);
+  if (!demo && tempF != null) {
+    if (tempF <= 20 && !coldSince) { coldSince = realNow; remember("coldSince", coldSince); }
+    if (tempF >= 28 && coldSince) { coldSince = 0; remember("coldSince", 0); }
+  }
+  const iced = !!coldSince && realNow - coldSince > 48 * 3600000;
+  beached = iced;
+  if (!demo && ["rain", "drizzle", "thunder"].includes(kind) && realNow - rainAt > 60000) { rainAt = realNow; remember("rainAt", rainAt); }
+  const sinceRain = realNow - rainAt;
+  const bowA = (kind === "clear" || kind === "partly") && sinceRain >= 0 && sinceRain < 45 * 60000
+    ? (1 - sinceRain / (45 * 60000)) * clamp(1 - p.dark * 2, 0, 1) : 0;
+  frostK = !snowCover && (!demo || state.forced) && tempF != null && tempF <= 32 ? clamp((33 - tempF) / 6, 0.15, 1) : 0;
+
   // Yggdrasil itself: on clear nights the World Tree's bare crown rises behind the mountains,
   // edged green while the northern lights are out
-  const treeA = clamp((p.dark - 0.6) / 0.4, 0, 1) * clamp(1 - cloud * 2, 0, 1);
+  const treeA = Math.max(0.22, clamp((p.dark - 0.6) / 0.4, 0, 1) * clamp(1 - cloud * 2, 0, 1));
   if (treeA > 0.03 && tree) {
     const th = (hz - oy) * 0.9, tw = th * tree.width / tree.height, cx = ox + ART_W * s * 0.5;
     ctx.globalAlpha = 0.92 * treeA;
     ctx.drawImage(tintedTree(mix(top, [0, 0, 0], 0.55)), cx - tw / 2, hz - th, tw, th + 2);
+    if (frostK > 0.05) {
+      ctx.globalAlpha = 0.43 * frostK * Math.max(treeA, 0.4) * (0.6 + 0.4 * Math.max(moonLight, light));
+      ctx.drawImage(tintedTree([220, 232, 244]), cx - tw / 2, hz - th - 1.5 * u, tw, th + 2);
+    }
     if (auroraA > 0.03) {
       ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.1 * auroraA * treeA;
       ctx.drawImage(glowTree(), cx - tw / 2, hz - th - 2 * u, tw, th + 2);
       ctx.globalCompositeOperation = "source-over";
     }
     ctx.globalAlpha = 1;
+    drawRatatoskr(cx - tw / 2, hz - th, tw, th, s, t, light);
   }
 
   // clouds
@@ -279,6 +313,7 @@ function draw(uptime) {
     bands.forEach((c, i) => { ctx.strokeStyle = rgba(hex(c), 0.2 * light * (1 - cloud * 0.6)); ctx.beginPath(); ctx.arc(bcx, bcy, r0 - i * bw, Math.PI, 2 * Math.PI); ctx.stroke(); });
   }
   if (fireworks) drawFireworks(w, hz, u, t, false);
+  if (bowA > 0.02) drawRainbow(w, h, hz, u, bowA);
 
   // the glow in the fjord's mouth at dawn and dusk
   const valleyX = ox + ART_W * s * 0.62;
@@ -343,12 +378,9 @@ function draw(uptime) {
     }
   }
 
+  if (iced) drawIce(w, hz, u, light);
   if (fg) ctx.drawImage(fg, ox, oy, ART_W * s, ART_H * s);         // the mountains
 
-  // snow lies on the steading while it falls, and for a day and a half after while it stays at freezing
-  if (!demo && kind === "snow" && realNow - snowAt > 600000) { snowAt = realNow; try { localStorage.setItem("snowAt", String(snowAt)); } catch (e) { } }
-  const tempF = state.weather && state.weather.tempF;
-  const snowCover = kind === "snow" || (!demo && realNow - snowAt < 36 * 3600000 && tempF != null && tempF <= 33);
 
   // the house as the feed reports it; the name-day lights every window and the hearth
   let hs = state.house;
@@ -363,7 +395,8 @@ function draw(uptime) {
   const flare = flareAge >= 0 && flareAge < 20000 ? (1 - flareAge / 20000) * (0.6 + 0.4 * Math.sin(t * 0.01)) : 0;
   const steadingMoves = drawSteading({ s, ox, oy, t, light, dark: p.dark, snow: snowCover, house: hs, feast, flare });
   // the places where the launcher's folders live (here without taps, so the fjords stay one world)
-  drawPlaces({ s, ox, oy, t, light, dark: p.dark, forge: !!(hs && hs.forge) });
+  drawPlaces({ s, ox, oy, t, light, dark: p.dark, forge: !!(hs && hs.forge), snow: snowCover,
+    printPct: hs && hs.print_pct != null ? +hs.print_pct : -1 });
 
   // the longship: it sails out of the fjord when no one's home and back when someone is,
   // rows while the house sends power to the grid, and its sail glows with the panels
@@ -389,6 +422,15 @@ function draw(uptime) {
     }
     if (shipRefl) drawShipReflection(t, fade, rowing);   // below its own waterline, rippling
     ctx.globalAlpha = fade; ctx.drawImage(shipTint, 0, 0); ctx.globalAlpha = 1;
+    // the wolves' eyes glow while one of the household is on the move: Freki's for Jason, Geri's for Leah
+    const movers = hs && hs.movers | 0;
+    for (const [bit, ex, ey] of [[1, 1565, 658], [2, 2530, 658]]) if (movers & bit) {
+      const a = (0.75 + 0.25 * Math.sin(t * 0.004 + bit)) * fade;
+      const g = ctx.createRadialGradient(ex, ey, 0, ex, ey, 26);
+      g.addColorStop(0, rgba(hex(0xFFC860), 0.8 * a)); g.addColorStop(1, rgba(hex(0xFFC860), 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(ex, ey, 26, 0, 6.283); ctx.fill();
+      ctx.fillStyle = rgba(hex(0xFFE9A8), a); ctx.beginPath(); ctx.arc(ex, ey, 5, 0, 6.283); ctx.fill();
+    }
     // the sail, filled by the real wind (as on the launcher): slack in a calm, bellied out in a
     // breeze, shuddering in a gale. In the demo the wind follows its weather.
     const wx = state.weather;
@@ -407,7 +449,9 @@ function draw(uptime) {
   const precip = PRECIP[kind] || 0;
   if (precip) drawPrecip(w, h, dt, t, precip, kind === "snow", light, u);
 
-  return !!demo || auroraA > 0.03 || precip > 0 || kind === "thunder" || steadingMoves || sailing || rowing || fireworks || flare > 0 || gale > 0.02;
+  const printing = !!(hs && hs.forge && hs.print_pct >= 0);     // the hammer's sparks want the full rate; eyes and rime are calm
+  return !!demo || auroraA > 0.03 || precip > 0 || kind === "thunder" || steadingMoves || sailing || rowing || fireworks || flare > 0 || gale > 0.02 ||
+    printing;
 }
 
 let puffTint = null, puffKey = "";
@@ -524,6 +568,9 @@ async function start() {
   if (q.has("wind")) state.weather = Object.assign(state.weather || {}, { windMph: +q.get("wind"), gustMph: +(q.get("gust") || 0) });
   if (q.has("feast")) state.feastUntil = Date.now() + 3600000;
   if (q.has("snow")) snowAt = Date.now();
+  if (q.has("temp")) state.weather = Object.assign(state.weather || {}, { tempF: +q.get("temp") });
+  if (q.has("ice")) coldSince = Date.now() - 50 * 3600000;
+  if (q.has("rainbow")) rainAt = Date.now() - 5 * 60000;
 
   // Yggdrasil OS (kde.html?selfhost): no host app, so the page fetches its own weather and the steading feed
   if (q.has("selfhost")) selfHost(+(q.get("lat") || 41.134), +(q.get("lon") || -81.485), q.get("feed") || "https://homelab.ozorhaar.com/steading");
@@ -550,6 +597,7 @@ const HALL_L = 1420, HALL_R = 1720;
 const SHIP = { x: 2048, wl: 892.8, s: 1.993333, draft: 12 };
 const shipPt = (u, v) => [SHIP.x + (u - 200) * SHIP.s, SHIP.wl + (v - SHIP.draft) * SHIP.s];
 const SHIP_PIVOT = shipPt(212, SHIP.draft);                           // centre of the waterline
+const SERPENT = [2950, 1080];                                          // Jörmungandr's waterline anchor, in the open fjord
 const SAIL = [...shipPt(100, -172), ...shipPt(300, -26)];             // sail cloth box
 const MAST_TOP = shipPt(200, -185);
 const SHIP_BOX = [...shipPt(-80, -192), ...shipPt(480, SHIP.draft)];  // everything above the water (Freki to Geri)
@@ -566,31 +614,87 @@ let tree = null;            // the World Tree silhouette
 
 // The places where the launcher's folders live, drawn by props.js (the launcher's Props.kt draws the same):
 // [prop, art x, where its foot goes, its footprint left and right of x (art px)]
-//   a number    - that art y (the cave in the mountainside, the knarr on the water)
+//   a number    - that art y (the cave in the mountainside, the knarr on the water, Jörmungandr's coils)
 //   "ground"    - on the land, at the lowest ground under the whole footprint, so on a slope the
 //                 base settles into the hillside instead of hanging off its downhill side
 //   "shore"     - on the foot of the mountain just above the water. On the desktop the mountains
 //                 run straight down into the fjord, so the waterline itself is water, not shore.
+// The desktop has no notifications, so nothing here stirs; Ratatoskr waits on his branch.
 const SHORE = SHIP.wl - 22;
 const PLACES = [["runestone", 900, "ground", -14, 14], ["cave", 520, 700], ["skald", 1150, "shore"],
-  ["smithy", 4050, "ground", -92, 60], ["cookfire", 3720, "shore"], ["knarr", 3950, 990]];
+  ["smithy", 4050, "ground", -128, 84], ["cookfire", 3720, "shore"], ["knarr", 3950, 990], ["serpent", SERPENT[0], SERPENT[1]]];
+const BEACHED = [3860, SHORE];      // where the knarr is drawn up when the fjord ices
 
 function placeY(ax, at, l, r) {
   if (typeof at === "number") return at;
   if (at === "shore") return SHORE;
   let y = 0;
-  for (let x = Math.round(ax + l); x <= Math.round(ax + r); x++) y = Math.max(y, groundTops[x]);
+  for (let x = Math.round(ax + l); x <= Math.round(ax + r); x++) y = Math.max(y, groundTops[clamp(x, 0, groundTops.length - 1)]);
   return y + 2;
 }
 
 function drawPlaces(o) {
   if (typeof Props === "undefined" || !groundTops) return;
-  const po = { light: o.light, dark: o.dark, t: o.t, forge: o.forge };
+  Props.set({ light: o.light, dark: o.dark, t: o.t, forge: o.forge, moon: moonLight, snow: o.snow, frost: frostK, printPct: o.printPct });
   for (const [name, ax, at, l = 0, r = 0] of PLACES) {
-    const y = placeY(ax, at, l, r);
-    ctx.save(); ctx.translate(o.ox + ax * o.s, o.oy + y * o.s); ctx.scale(o.s, o.s);
-    Props[name](ctx, po);
+    const ice = name === "knarr" && beached;
+    const x = ice ? BEACHED[0] : ax, y = ice ? BEACHED[1] : placeY(ax, at, l, r);
+    ctx.save(); ctx.translate(o.ox + x * o.s, o.oy + y * o.s); ctx.scale(o.s, o.s);
+    // a cool pool of moonlight behind each place, so it stands out against the dark
+    if (moonLight > 0.03 && name !== "serpent") {
+      const gr = ctx.createRadialGradient(10, -60, 0, 10, -60, 110);
+      gr.addColorStop(0, `rgba(207,219,240,${(0.2 * moonLight).toFixed(3)})`); gr.addColorStop(1, "rgba(207,219,240,0)");
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(10, -60, 110, 0, 6.283); ctx.fill();
+    }
+    if (ice) { ctx.scale(0.7, 0.7); Props.knarrBeached(ctx); }
+    else Props[name](ctx);
     ctx.restore();
+  }
+}
+
+/** Ratatoskr on the World Tree's long right-hand limb (found when the tree is made), sitting on top of it. */
+function drawRatatoskr(l, tp, tw, th, s, t, light) {
+  const b = tree && tree.branch; if (!b) return;
+  const P = (i) => [l + b[i * 2] * tw, tp + b[i * 2 + 1] * th];
+  const [x0, y0] = P(0), [x1, y1] = P(1);
+  const u = 0.85, x = x0 + (x1 - x0) * u, y = y0 + (y1 - y0) * u, a = Math.atan2(y1 - y0, x1 - x0);
+  const k = 1.9 * s, hw = b[4] * tw / 2, nx = Math.sin(a), ny = -Math.cos(a), lift = hw + 9 * k;
+  Props.set({ light, t, moon: moonLight });
+  ctx.save();
+  ctx.translate(x + nx * lift, y + ny * lift);
+  ctx.rotate(a + Math.PI / 2);
+  ctx.scale(-k, k);
+  Props.squirrel(ctx);
+  ctx.restore();
+}
+
+/** Bifröst after rain: a faint rainbow arched over the fjord, behind the mountains. */
+function drawRainbow(w, h, hz, u, a) {
+  const cols = [0xE05050, 0xE0A040, 0xE8D860, 0x70C070, 0x6090E0, 0x8A70D0];
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, hz); ctx.clip();
+  ctx.lineWidth = 10 * u;
+  const cx = w * 0.62, cy = hz + h * 0.06, r0 = Math.max(w * 0.3, h * 0.78);
+  cols.forEach((c, i) => { ctx.strokeStyle = rgba(hex(c), 0.16 * a); ctx.beginPath(); ctx.arc(cx, cy, r0 - i * 10 * u, 0, 6.283); ctx.stroke(); });
+  ctx.restore();
+}
+
+/** A long cold spell: shelves of ice along the fjord's edges, cracked, with the light on them. */
+function drawIce(w, hz, u, light) {
+  const ice = mix(hex(0x8FA6BC), hex(0xE6EEF4), light);
+  ctx.fillStyle = rgba(ice, 0.55);
+  for (let side = 0; side < 2; side++) {
+    const x0 = side === 0 ? 0 : w * 0.78, x1 = side === 0 ? w * 0.22 : w;
+    ctx.beginPath(); ctx.moveTo(x0, hz);
+    for (let x = x0; x <= x1; x += 8 * u) {
+      const edge = side === 0 ? (x1 - x) / (x1 - x0) : (x - x0) / (x1 - x0);
+      ctx.lineTo(x, hz + (8 + 52 * edge + 6 * Math.sin(x / (23 * u))) * u);
+    }
+    ctx.lineTo(x1, hz); ctx.closePath(); ctx.fill();
+  }
+  ctx.strokeStyle = rgba(mix(hex(0x3A4A5C), hex(0x7E93A8), light), 0.35); ctx.lineWidth = 1.3 * u;
+  for (let k = 0; k < 7; k++) {
+    const xx = k < 4 ? w * (0.03 + k * 0.045) : w * (0.82 + (k - 4) * 0.05);
+    ctx.beginPath(); ctx.moveTo(xx, hz + 6 * u); ctx.lineTo(xx + 18 * u, hz + 26 * u); ctx.lineTo(xx + 9 * u, hz + 40 * u); ctx.stroke();
   }
 }
 
@@ -659,7 +763,8 @@ function makeTree() {
     const a = -Math.PI / 2 + (r() - 0.5) * 0.12, x2 = x + Math.cos(a) * 90, y2 = y + Math.sin(a) * 90;
     segs.push([x, y, x2, y2, sw]); x = x2; y = y2; sw *= 0.92;
   }
-  for (const a of [-Math.PI / 2 - 0.7, -Math.PI / 2 - 0.15, -Math.PI / 2 + 0.5]) branch(x, y, a, 150, sw * 0.7, 9);
+  let limb = 0;
+  for (const a of [-Math.PI / 2 - 0.7, -Math.PI / 2 - 0.15, -Math.PI / 2 + 0.5]) { limb = segs.length; branch(x, y, a, 150, sw * 0.7, 9); }
   let minX = 0, maxX = 0, minY = 0;
   for (const g of segs) { minX = Math.min(minX, g[0], g[2]); maxX = Math.max(maxX, g[0], g[2]); minY = Math.min(minY, g[1], g[3]); }
   const sc = Math.min((wd - 20) / (maxX - minX), (ht - 10) / -minY), cx = wd / 2 - (minX + maxX) / 2 * sc;
@@ -669,6 +774,9 @@ function makeTree() {
     g.lineWidth = Math.max(1, s[4] * sc);
     g.beginPath(); g.moveTo(cx + s[0] * sc, ht + s[1] * sc); g.lineTo(cx + s[2] * sc, ht + s[3] * sc); g.stroke();
   }
+  // Ratatoskr's branch: the right-hand great limb's first reach (x0, y0, x1, y1 as fractions, and its width)
+  const L = segs[limb];
+  c.branch = [(cx + L[0] * sc) / wd, (ht + L[1] * sc) / ht, (cx + L[2] * sc) / wd, (ht + L[3] * sc) / ht, L[4] * sc / wd];
   return c;
 }
 
@@ -790,8 +898,9 @@ function drawSteading(o) {
   }
 
   // snow on the turf roof and along the shelf
-  if (snow) {
-    ctx.fillStyle = rgba(mix(hex(0x8A93A6), hex(0xEEF2F8), light * 0.8 + 0.2));
+  if (snow || frostK > 0.05) {      // or a thin rime of hoarfrost, in the snow's shape
+    ctx.fillStyle = snow ? rgba(mix(hex(0x8A93A6), hex(0xEEF2F8), light * 0.8 + 0.2))
+      : rgba(mix(hex(0xB8C8DC), hex(0xEAF2FA), light), 0.18 + 0.4 * frostK);
     ctx.beginPath(); ctx.moveTo(l - 16 * s, wallTop + 4 * s);
     ctx.quadraticCurveTo(l + 10 * s, ridge + 18 * s, l + 40 * s, ridge); ctx.lineTo(r - 40 * s, ridge);
     ctx.quadraticCurveTo(r - 10 * s, ridge + 18 * s, r + 16 * s, wallTop + 4 * s);
