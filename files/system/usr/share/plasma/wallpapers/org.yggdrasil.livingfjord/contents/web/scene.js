@@ -622,7 +622,7 @@ let tree = null;            // the World Tree silhouette
 // The desktop has no notifications, so nothing here stirs; Ratatoskr waits on his branch.
 const SHORE = SHIP.wl - 22;
 const PLACES = [["runestone", 900, "ground", -14, 14], ["cave", 520, 700], ["skald", 1150, "shore"],
-  ["smithy", 4050, "ground", -128, 84], ["cookfire", 3720, "shore"], ["knarr", 3950, 990], ["serpent", SERPENT[0], SERPENT[1]]];
+  ["smithy", 4100, "ground", -150, 96], ["cookfire", 3720, "shore"], ["knarr", 3950, 990], ["serpent", SERPENT[0], SERPENT[1]]];
 const BEACHED = [3860, SHORE];      // where the knarr is drawn up when the fjord ices
 
 function placeY(ax, at, l, r) {
